@@ -34,6 +34,7 @@ class Stream:
     protocol: str = 'flv'
     bitrate: int = 0
     codec: str = ''
+    quality: str = ''
 
 @dataclass(frozen=True)
 class LiveMetrics:
@@ -120,6 +121,7 @@ def identifier(value):
     return value
 
 FIELDS = {
+    'quality_setting': {'session', 'quality'},
     'open': {'nonce'}, 'heartbeat': {'session'}, 'stop': {'session'},
     'snapshot': {'session', 'tab', 'query', 'filter', 'page'},
     'add': {'session', 'source'}, 'start': {'session', 'host_id'},
@@ -145,6 +147,8 @@ def validate_request(operation, arguments):
     if fields != FIELDS[operation] and not (operation in ORDERED_CONTROLS and fields == FIELDS[operation] | {'sequence'}) and not (operation == 'credential' and fields == FIELDS[operation] | {'source'}) and not (operation == 'comments' and
             fields == FIELDS[operation] | {'range_start', 'range_end'}):
         raise LiveError('直播操作字段无效')
+    if operation == 'quality_setting' and arguments['quality'] not in {'origin', '1080p', '720p', '540p'}:
+        raise LiveError('请选择原画、1080P、720P 或标清档位')
     for key, value in arguments.items():
         if key == 'sequence':
             if type(value) is not int or not 1 <= value <= 2**53 - 1:

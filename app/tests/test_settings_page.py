@@ -18,7 +18,7 @@ from src.core.updater.models import UpdateSnapshot
 from src.core.user_notifications import AuthorizationStatus, PermissionResult
 from src.ui import theme as T
 from src.ui.consumer_select import ConsumerSelect
-from src.ui.settings_page import AuthorContactDialog, SettingsPage
+from src.ui.settings_page import SettingsPage
 
 
 class _Controller(QObject):

@@ -57,7 +57,7 @@ class MediaTasks:
             raise ValueError('任务文件不安全')
         return path
 
-    def prepare(self, conversation_id, request_id, source_path, engine):
+    def prepare(self, conversation_id, request_id, source_path, engine, *, speaker_document_id=None):
         self.application.assert_workspace_allowed('WS-24')
         identity(request_id)
         if len(request_id) > 100 or type(source_path) is not str:
@@ -73,11 +73,22 @@ class MediaTasks:
         with self.lock, library._transaction():
             chat = WorkspaceStore().get(conversation_id)
             doc = documents.snapshot(chat['document_id'])
+            speaker_document = None
+            if speaker_document_id is not None:
+                from ..engines.speaker_embedding import model_path
+                model_path()
+                if (speaker_document_id != doc['id'] or doc.get('engine') != 'local_moss_q5'
+                        or engine != 'local_moss_q5' or doc.get('source') != source_path
+                        or not doc.get('segments') or doc.get('meta', {}).get('segments_stale')):
+                    raise ValueError('整场匹配需要当前未修改的 MOSS 时间轴和对应原录音。')
+                speaker_document = {key: doc.get(key) for key in
+                    ('id', 'revision', 'content_hash', 'segments', 'language', 'engine', 'meta')}
             library_root = str(library._dir())
             path = self.path('media-' + request_id)
             if path.exists():
                 old = json.loads(path.read_text())
-                if (old['conversation_id'], old['source_path'], old['engine']) != (conversation_id, source_path, engine):
+                if ((old['conversation_id'], old['source_path'], old['engine']) != (conversation_id, source_path, engine)
+                        or old.get('speaker_document', {}).get('id') != speaker_document_id):
                     raise library.RevisionConflict('此计划编号已有不同输入，未覆盖')
                 return self.summary(old)
         # Hashing and readiness checks never hold the library write lock.
@@ -88,6 +99,9 @@ class MediaTasks:
                     library_root=library_root, source_path=source_path, filename=source.name,
                     engine=engine, source=checked['source_summary'], title=source.stem,
                     folder_id=doc.get('folder_id'), created_at=self.now())
+        if speaker_document is not None:
+            plan['speaker_document'] = speaker_document
+            plan['title'] += ' · 整场分人'
         with self.lock, library._transaction():
             self._same_library(plan)
             if path.exists():
@@ -102,7 +116,20 @@ class MediaTasks:
     def summary(plan):
         return {k: plan[k] for k in ('plan_id', 'conversation_id', 'filename', 'engine')} | dict(
             plan_hash=documents.digest(encode(plan)), bytes=plan['source']['bytes'], state='ready',
-            message=f"使用本地 {LOCAL_MODELS[plan['engine']].display_name} 转录，完成后另存一篇新文稿。")
+            message=('仅以本地声纹统一整场编号，保留原文字和时间戳，另存新文稿。'
+                     if plan.get('speaker_document') else
+                     f"使用本地 {LOCAL_MODELS[plan['engine']].display_name} 转录，完成后另存一篇新文稿。"))
+
+    @staticmethod
+    def _ledger_policy(plan):
+        # The ledger intentionally caps policies at 64 KiB. The immutable plan
+        # file holds the large snapshot; intent_payload_digest binds its bytes.
+        # Keep only its identity/revision in the authenticated ledger policy.
+        policy = dict(plan)
+        if plan.get('speaker_document'):
+            policy['speaker_document'] = {key: plan['speaker_document'][key]
+                                          for key in ('id', 'revision', 'content_hash')}
+        return policy
 
     @staticmethod
     def _same_library(plan):
@@ -139,7 +166,7 @@ class MediaTasks:
                 raise RuntimeError('本地转录服务尚未就绪，请重新打开 Lulu')
             job = self.control._store.create_job(job_id=jid, attempt_id='media-attempt-' + uuid4().hex,
                 lineage_id='media-lineage-' + uuid4().hex, job_kind=KIND,
-                input_ref='source:sha256:' + plan['source']['sha256'], frozen_policy=plan,
+                input_ref='source:sha256:' + plan['source']['sha256'], frozen_policy=self._ledger_policy(plan),
                 created_by='agent_cli' if origin == 'cli' else 'gui',
                 installation_id=self.application.verified_installation_id(), canonical_operation_id='OP_WORKSPACE_MEDIA_V1',
                 idempotency_key=jid, intent_payload_digest=expected_hash, created_at=self.now(),
@@ -242,8 +269,11 @@ class MediaTasks:
                 self._copy_source(plan, source, cancelled)
                 if cancelled():
                     raise RuntimeError('已停止')
-                result = self.application._transcription_service.transcribe(LocalFileTranscriptionRequestV1(str(source), engine_name=plan['engine']),
-                    progress=progress, is_cancelled=cancelled)
+                if plan.get('speaker_document'):
+                    result = self._link_recording_speakers(plan, source, Path(folder), cancelled, progress)
+                else:
+                    result = self.application._transcription_service.transcribe(LocalFileTranscriptionRequestV1(str(source), engine_name=plan['engine']),
+                        progress=progress, is_cancelled=cancelled)
                 with self.lock:
                     if cancelled():
                         raise RuntimeError('已停止')
@@ -282,8 +312,39 @@ class MediaTasks:
             with self.lock:
                 self.workers.pop(jid, None)
 
+    @staticmethod
+    def _check_speaker_source(plan):
+        frozen = plan['speaker_document']
+        current = documents.snapshot(frozen['id'])
+        if (current['revision'], current['content_hash']) != (frozen['revision'], frozen['content_hash']):
+            raise library.RevisionConflict('原稿在声纹匹配期间发生修改，双方结果保留，未自动发布。')
+
+    def _link_recording_speakers(self, plan, source, folder, cancelled, progress):
+        from ..engines.asr_resource import model_use
+        from ..audio.converter import to_wav_16k_mono
+        from ..engines.speaker_embedding import extract_embeddings
+        from ..engines.global_speakers import link_speakers
+        from ..models import Segment, Transcript
+        from ..transcription_contracts import result_from_transcript
+        self._check_speaker_source(plan)
+        frozen = plan['speaker_document']
+        segments = [Segment(**row) for row in frozen['segments']]
+        with model_use(plan['engine']):
+            wav = to_wav_16k_mono(source, folder/'speakers.wav', is_cancelled=cancelled)
+            embeddings = extract_embeddings(wav, segments, cancelled=cancelled, progress=progress)
+            linked, _audit = link_speakers(segments, embeddings, cancelled=cancelled, allow_unresolved=True)
+        result = Transcript('\n'.join(row.text for row in linked), linked,
+            frozen['language'], frozen['engine'], source=str(source),
+            meta={'asr': dict(frozen.get('meta', {}).get('asr', {}))})
+        return result_from_transcript(result)
+
     def _publish(self, job, lease, stored):
         plan, jid = job.frozen_policy, job.job_id
+        if plan.get('speaker_document'):
+            expanded = self._plan(plan['plan_id'], job.intent_payload_digest)
+            if self._ledger_policy(expanded) != plan:
+                raise library.RevisionConflict('声纹计划与任务凭据不一致，未发布。')
+            plan = expanded
         raw = self.application.read_result_bytes(jid, stored['result_ref'])
         if hashlib.sha256(raw).hexdigest() != stored['content_hash']:
             raise ValueError('转录结果校验失败，未导入文稿')
@@ -293,6 +354,15 @@ class MediaTasks:
             raise ValueError('转录结果内容无效，未导入文稿')
         result.meta.update(workspace_job_id=jid, conversation_id=plan['conversation_id'],
                            source_document_id=plan['document_id'])
+        if plan.get('speaker_document'):
+            from ..engines.speaker_embedding import MODEL_REVISION
+            self._check_speaker_source(plan)
+            result.meta = {**plan['speaker_document'].get('meta', {}), **result.meta}
+            result.meta.update(diarization_scope='recording', speaker_model='funasr/campplus',
+                speaker_model_revision=MODEL_REVISION, speaker_link_threshold=.65,
+                speaker_count=len({s.speaker_id for s in result.segments if s.speaker_id is not None}),
+                speaker_unresolved_turns=sum(s.speaker_id is None for s in result.segments),
+                diarization_notice='整场按声纹匹配匿名编号；极短或重叠发言缺少足够证据时标为待确认。声线相似仍需核对，编号不代表真实姓名。')
         eid = 'transcript_' + jid
         library.save(result, plan['title'], plan['folder_id'], entry_id=eid)
         library.finish_transcript_document(eid, result, plan['title'])

@@ -15,6 +15,7 @@ import tempfile
 from threading import RLock
 
 from .core.engines.registry import DEFAULT_ENGINE
+from .appearance import normalize_theme
 
 from .edition import config_root
 
@@ -461,7 +462,7 @@ class AppConfig:
     collection_mode: str = "partial"    # 主页采集方式:partial|full；非法值保守回部分采集
 
     def __post_init__(self) -> None:
-        self.theme = "warm"
+        self.theme = normalize_theme(self.theme)
         if type(self.interface_font_percent) is not int or not 90 <= self.interface_font_percent <= 130:
             self.interface_font_percent = 100
         _normalize_feishu_storage_config(self)
@@ -505,7 +506,7 @@ class AppConfig:
 
     def save(self) -> bool:
         with _CONFIG_SAVE_LOCK:
-            self.theme = "warm"
+            self.theme = normalize_theme(self.theme)
             _normalize_feishu_storage_config(self)
             config_dir = _CONFIG_PATH.parent
             previous: bytes | None = None

@@ -2,17 +2,18 @@
 
 让你常用的 Agent 调用本机 Lulu，处理文稿、转录、配音与素材任务。技能按需安装，也可单独卸载；无需重新下载 Lulu。
 
-[下载完整 Skill 包（ZIP）](https://github.com/AidenXu-1/lulu-agent/archive/refs/heads/main.zip) · [安装方法](#安装) · [Lulu 产品主页与 App 下载](https://github.com/AidenXu-1/Lulu)
+[下载仓库 ZIP（技能位于 agent-skill）](https://github.com/paulussamvel-lang/Lulu/archive/refs/heads/main.zip) · [安装方法](#安装) · [Paul工作台源码](https://github.com/paulussamvel-lang/Lulu)
 
-当前说明已按 **Lulu 4.3.4 / 20261109.3** 核对：支持逐作品提取任务、本地与云端批量转录，以及当前开放的采集、导出、素材与直播管理入口。对应正式版本及下载见 [Lulu 4.3.4](https://github.com/AidenXu-1/Lulu/releases/tag/v4.3.4)。CLI 已包含在 Lulu App 内；此仓库提供 AI 助手调用它所需的说明与校验脚本，无需另外下载 CLI。
+当前定制说明已按 **Paul工作台 4.3.4 / 20261115.1** 核对，新增文案精选选题查询、新建与候选文案写入；原有转录、配音、采集和直播接口按安装包实际返回的清单使用。此仓库当前提供源码与完整 Skill；上游安装包不包含新增的 editorial 接口。CLI 随 App 提供，无需单独下载。
 
-**Skill 与 App 独立更新。** 本次只同步调用说明，继续使用原有安装检查工具和 CLI 1.0.0 协议，无需重新打包或下载 App。不会替换 App 内的受管 Skill，也不改动文稿、模型、音色或任务。已单独安装的 Skill 需要按下方方法更新；更新 App 不会自动覆盖这个独立副本。
+**Skill 与 App 独立更新。** 继续使用原有安装检查工具和 CLI 1.0.0 协议；新增接口需要已安装 20261115.1 或兼容版本。不会替换 App 内的受管 Skill，也不改动文稿、模型、音色或任务。已单独安装的 Skill 需要按下方方法更新；更新 App 不会自动覆盖这个独立副本。
 
 ## 可以做什么
 
 | 功能 | 用途 |
 | --- | --- |
 | 文稿 | 查找、读取、创建、改稿，查询和恢复历史版本 |
+| 文案精选 | 查询、新建选题；添加正文或复制现有文稿到候选列表 |
 | AI 对话 | 使用 Lulu 中配置的模型处理内容，查看或取消任务 |
 | 本地转录 | 音频和视频转文字，查询模型与完整结果 |
 | 本地配音 | 使用已安装模型和保存的音色生成音频 |
@@ -31,15 +32,15 @@
 
 先安装并打开 Lulu，完成正常安装准备，再把下面这段话发给你使用的 Agent：
 
-> 请访问 https://github.com/AidenXu-1/lulu-agent ，阅读 README，下载完整的 lulu-agent 文件夹，安装到你当前使用的技能目录。先检查脚本和兼容性，不覆盖已有同名内容。保留所有 scripts 和 references 文件。不要改动 Lulu 管理的 ~/.agents/skills/lulu-agent，也不要安装或删除 Lulu 后台组件。安装后按 SKILL.md 验证本机 Lulu，再查询实际可用功能。本次仅安装与检查连接，不下载模型，不修改文稿，不开始转录、配音或云端调用。
+> 请访问 https://github.com/paulussamvel-lang/Lulu/tree/main/agent-skill ，阅读 README，下载完整的 agent-skill/lulu-agent 文件夹，安装到你当前使用的技能目录。先检查脚本和兼容性，不覆盖已有同名内容。保留所有 scripts 和 references 文件。不要改动 Lulu 管理的 ~/.agents/skills/lulu-agent，也不要安装或删除 Lulu 后台组件。安装后按 SKILL.md 验证本机 Lulu，再查询实际可用功能。本次仅安装与检查连接，不下载模型，不修改文稿，不开始转录、配音或云端调用。
 
 手动下载 ZIP 后先解压，并保留整个 `lulu-agent` 文件夹及其中的 `scripts`、`references`；只下载 `SKILL.md` 无法完成校验。
 
 也可以克隆本仓库后，使用系统已有的 Python 3 安装。例如，为使用 `~/.codex/skills` 的 Agent 安装：
 
 ```sh
-git clone https://github.com/AidenXu-1/lulu-agent.git
-cd lulu-agent
+git clone https://github.com/paulussamvel-lang/Lulu.git
+cd Lulu/agent-skill
 python3 -B manage.py install --skills-dir "$HOME/.codex/skills"
 ```
 

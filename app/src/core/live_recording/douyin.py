@@ -115,7 +115,7 @@ def parse_room(payload, web_rid=''):
                 for protocol in ('flv', 'hls'):
                     url = stream.get(protocol)
                     if safe_stream_url(url):
-                        choices.append(Stream(url, protocol, bitrate, codec))
+                        choices.append(Stream(url, protocol, bitrate, codec, str(quality)))
     except (TypeError, ValueError, AttributeError):
         return Observation('parse_error', sec_uid, rid, name, metrics=metrics)
     if not choices:
@@ -127,7 +127,7 @@ def parse_room(payload, web_rid=''):
             if isinstance(values, dict):
                 for quality, url in values.items():
                     if safe_stream_url(url):
-                        choices.append(Stream(url, protocol, quality_rank.get(quality, 0)))
+                        choices.append(Stream(url, protocol, quality_rank.get(quality, 0), quality=str(quality)))
     choices.sort(key=lambda s: (-s.bitrate, s.codec not in {'h264', 'avc'}, s.protocol != 'flv'))
     internal = str(room.get('id_str') or room.get('id') or '')
     internal = internal if re.fullmatch(r'[0-9]{1,20}', internal) else ''

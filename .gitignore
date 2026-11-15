@@ -49,6 +49,8 @@ tmp/
 # PyInstaller 打包产物(体积大,不入库;用 packaging/build_app.sh 现生成)
 app/build/
 app/dist/
+app/dist.noindex/
+app/application-backups.noindex/
 app/release/
 # 仅限本机阶段内 E2E 的内部测试 App，禁止入库或外发
 app/internal-test-builds/

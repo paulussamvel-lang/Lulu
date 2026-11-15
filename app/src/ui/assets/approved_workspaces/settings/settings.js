@@ -63,7 +63,7 @@ const pages = {
   skills:{title:'技能',icon:'skill',scenes:[['normal','正常状态'],['empty','空列表'],['failure','读取失败']]},
   cli:{title:'CLI 与 Agent',icon:'terminal',scenes:[['normal','尚未连接'],['ready','已连接'],['failure','连接异常']]},
   feishu:{title:'飞书知识库',icon:'feishu',scenes:[['normal','首次连接'],['ready','已连接'],['expired','授权失效']]},
-  about:{title:'关于 Lulu',icon:'info',scenes:[['normal','当前版本'],['available','发现更新'],['failure','下载失败']]},
+  about:{title:'关于 Paul工作台',icon:'info',scenes:[['normal','当前版本'],['available','发现更新'],['failure','下载失败']]},
 };
 
 let state = {page:'general',prefs:{font:100,notification:'never'},paths:[],managed:[],skills:[],
@@ -86,7 +86,7 @@ function toast(text) {
 function renderNavigation() {
   $('#settings-title').innerHTML = icon('settings');
   $('#search-icon').innerHTML = icon('search');
-  $('#navigation').innerHTML = `<div id="nav-ink" class="nav-ink"></div>` + [['日常偏好',['general','storage']],['扩展与连接',['skills','cli','feishu']],['LULU',['about']]].map(([name,keys]) => `<div class="nav-group"><div class="nav-heading">${name}</div>${keys.map(key => `<button class="nav-button" data-action="navigate" data-id="${key}" aria-current="${state.page === key ? 'page' : 'false'}">${icon(pages[key].icon)}<span>${pages[key].title.replace('关于 Lulu','关于')}</span></button>`).join('')}</div>`).join('');
+  $('#navigation').innerHTML = `<div id="nav-ink" class="nav-ink"></div>` + [['日常偏好',['general','storage']],['扩展与连接',['skills','cli','feishu']],['PAUL',['about']]].map(([name,keys]) => `<div class="nav-group"><div class="nav-heading">${name}</div>${keys.map(key => `<button class="nav-button" data-action="navigate" data-id="${key}" aria-current="${state.page === key ? 'page' : 'false'}">${icon(pages[key].icon)}<span>${pages[key].title.replace('关于 Paul工作台','关于')}</span></button>`).join('')}</div>`).join('');
 }
 function moveNavInk(instant = false) {
   const selected = $('.nav-button[aria-current="page"]');const ink = $('#nav-ink');
@@ -134,6 +134,8 @@ function reserveTaskHeight() {
 
 function renderGeneral() {
   const p=state.prefs;
+  const palettes=[['forest','森林绿'],['sky','浅蓝色'],['latte','浅棕色'],['cream','米黄色'],['blush','浅粉色'],['warm','原版宣纸']];
+  const colors=`<div class="surface">${row('workbench-colors','工作台配色','沿用绿色方案的布局，切换立即生效并记住选择。',`<select class="control-select" data-pref="theme" aria-label="工作台配色">${palettes.map(([id,label])=>`<option value="${id}" ${p.theme===id?'selected':''}>${label}</option>`).join('')}</select>`)}</div>`;
   const reading=`<div class="surface">${row('font-size','界面字号','为阅读、改稿和日常操作，选一个舒服的大小。',fontSlider(p.font))}</div>`;
   const running=`<div class="surface">${row('awake','任务期间保持 Mac 唤醒','处理或录制结束后恢复系统原有行为，屏幕仍可自动熄灭。',toggle('awake',p.awake,'任务期间保持 Mac 唤醒'))}</div>`;
   const notifications=`<div class="surface">${row('notification-time','何时通知','你在别处工作时，也能知道 Lulu 的处理结果。',`<select class="control-select" data-pref="notification" aria-label="何时通知"><option value="inactive" data-description="在其他应用工作时提醒" ${p.notification==='inactive'?'selected':''}>仅 Lulu 在后台时</option><option value="always" data-description="无论前台或后台都通知" ${p.notification==='always'?'selected':''}>始终通知</option><option value="never" data-description="仅在 Lulu 任务区保留状态" ${p.notification==='never'?'selected':''}>从不通知</option></select>`)}
@@ -142,7 +144,7 @@ function renderGeneral() {
     <div class="setting-row"><p class="inline-note" id="notification-note">通知仅显示任务状态，内容详情留在 Lulu 内。</p><div class="row-control">${btn('试看提醒','notification-preview',{kind:'quiet',icon:'bell'})}</div></div></div>`;
   const permission=`<div class="surface">${row('permissions','系统权限','查看通知、麦克风与系统声音录制相关权限。',btn('查看与管理','permissions',{icon:'chevron'}))}</div>`;
   const taskChoices=disclosure('任务结束与退出',`${row('confirm-exit','有任务时，退出前确认','保留你此前的选择，避免误关正在处理的任务。',toggle('confirmExit',p.confirmExit,'有任务时退出前确认'))}${row('completion-action','完成后如何查看结果','批量处理时，保持当前页面可减少操作中断。',`<select class="control-select" data-pref="completionAction" aria-label="完成后如何查看结果"><option value="stay" ${p.completionAction==='stay'?'selected':''}>保持当前页面</option><option value="open_result" ${p.completionAction==='open_result'?'selected':''}>打开对应结果</option></select>`)}`,'保留原有偏好');
-  return section('任务运行',running+taskChoices,'moon')+section('阅读与操作',reading,'type')+section('结果提醒',notifications,'bell')+section('系统权限',permission,'shield');
+  return section('工作台外观',colors,'type')+section('任务运行',running+taskChoices,'moon')+section('阅读与操作',reading,'type')+section('结果提醒',notifications,'bell')+section('系统权限',permission,'shield');
 }
 function syncNotifications() {
   const disabled=state.prefs.notification==='never';
@@ -162,7 +164,7 @@ function renderStorage() {
     : old?.state==='partial' ? ['部分旧记录尚未合并','已核验且没有冲突的任务已继承，其他旧原件完整保留。'] : null;
   const recovery=status?section('旧版资料',`<div class="surface">${row('legacy-inheritance',esc(status[0]),esc(status[1]),
     old.state==='failed'&&!old.active?btn('重试资料检查','retry-inheritance'):'')}</div>`,'archive'):'';
-  return groups+section('Lulu 管理的资料',disclosure('查看资料位置',`<p class="inline-note">文稿、音频和对话由 Lulu 保存在本机。恢复或删除资料，请在资料库的「归档」中操作。</p>${managed.map(([title,desc,path])=>`<div class="managed-row"><div>${title}<p>${desc}</p></div>${btn('查看位置',path?'managed-path':'live-location',{kind:'quiet',extra:`data-title="${title}" data-path="${esc(path)}"`})}</div>`).join('')}`,'本机资料，按需查看','managed-locations'),'folder')+recovery;
+  return groups+section('工作台管理的资料',disclosure('查看资料位置',`<p class="inline-note">文稿、音频和对话由 Lulu 保存在本机。恢复或删除资料，请在资料库的「归档」中操作。</p>${managed.map(([title,desc,path])=>`<div class="managed-row"><div>${title}<p>${desc}</p></div>${btn('查看位置',path?'managed-path':'live-location',{kind:'quiet',extra:`data-title="${title}" data-path="${esc(path)}"`})}</div>`).join('')}`,'本机资料，按需查看','managed-locations'),'folder')+recovery;
 }
 function emptyState(title, text, action = '', actionTitle = '') {
   return `<div class="empty-state">${icon('search')}<h3>${title}</h3><p>${text}</p>${action?btn(actionTitle,action):''}</div>`;
@@ -210,10 +212,10 @@ function renderFeishu() {
 function renderAbout() {
   const u=state.update;
   const status=u.presentation;
-  const brand=`<div class="about-brand"><img src="../shared/lulu.png" alt="Lulu 图标"><div><div class="about-name"><h2>${state.meta.experience?'Lulu 开发体验版':'Lulu'}</h2><span class="badge blue">${esc(state.meta.version)}</span></div><p>一个专为你省钱的内容助手。<br><span>构建 ${esc(state.meta.build)}</span></p></div></div>`;
+  const brand=`<div class="about-brand"><img src="../shared/lulu.png" alt="Paul工作台 图标"><div><div class="about-name"><h2>${state.meta.experience?'Paul工作台 开发体验版':'Paul工作台'}</h2><span class="badge blue">${esc(state.meta.version)}</span></div><p>下载、转录、文案与配音。<br><span>构建 ${esc(state.meta.build)}</span></p></div></div>`;
   const update=`<div class="surface" id="software-update"><div class="update-summary"><div class="update-symbol ${u.state==='failure'?'error':''}">${icon(status[4])}</div><div class="row-text"><div class="row-title">${esc(status[0])}</div><div class="row-description">${esc(status[1])}</div></div>${status[2]?`<div class="actions">${btn(status[2],status[3]||'noop',{disabled:!status[3],kind:u.state==='current'||u.state==='completed'?'':'primary'})}</div>`:''}</div>${['downloading','paused','ready'].includes(u.state)?`<div class="update-progress"><div class="progress-track"><div id="update-fill" class="progress-fill" style="width:${u.progress ?? 0}%"></div></div><p id="update-progress-label">${u.state==='ready'?'已下载并完成验证':`已下载 ${Math.round(u.progress)}%`}</p></div>`:''}${u.state==='disabled'?'':`<div class="update-auto">${row('auto-update','自动检查更新','定期查看版本信息，安装前仍由你决定。',toggle('autoUpdate',state.prefs.autoUpdate,'自动检查更新'))}</div>`}</div>`;
-  const info=`<div class="surface"><div class="about-link"><div>项目仓库<p>查看源码、使用说明与公开版本</p></div><a class="btn quiet" href="https://github.com/AidenXu-1/Lulu" target="_blank" rel="noreferrer noopener">打开仓库${icon('external')}</a></div><div class="about-link"><div>作者 · 兆基<p>AI 运营与内容创作</p></div><div class="actions"><a class="btn quiet" href="https://github.com/AidenXu-1" target="_blank" rel="noreferrer noopener">GitHub${icon('external')}</a>${btn('联系方式','contact',{kind:'quiet'})}</div></div><div class="about-link"><div>版本信息<p>排查问题时可以复制给提供帮助的人</p></div>${btn('复制信息','copy-version',{kind:'quiet',icon:'copy'})}</div></div>`;
-  return brand+section('软件更新',update,'refresh')+`${u.notes?`<div class="group">${disclosure('查看本版说明',`<p class="inline-note">${esc(u.notes)}</p>`)}</div>`:''}`+section('产品与作者',info,'info')+section('分发说明','<p id="distribution-notice" class="inline-note">当前为信任用户内测包，未使用 Apple Developer ID 签名，也未通过 Apple 公证。首次打开可能需要你在系统设置中确认。</p>','info')+disclosure('本机处理与联网范围','<p class="inline-note">本地转录与本地配音在本机处理。链接下载、主页采集、直播、模型下载、检查更新，以及主动选择的云端模型和飞书保存会联网。使用云端模型前会告知上传内容与账户计费；Lulu 不会自动上传你的文稿。</p>');
+  const info=`<div class="surface"><div class="about-link"><div>版本信息<p>排查问题时可以复制给提供帮助的人</p></div>${btn('复制信息','copy-version',{kind:'quiet',icon:'copy'})}</div></div>`;
+  return brand+section('软件更新',update,'refresh')+`${u.notes?`<div class="group">${disclosure('查看本版说明',`<p class="inline-note">${esc(u.notes)}</p>`)}</div>`:''}`+section('工作台信息',info,'info')+section('分发说明','<p id="distribution-notice" class="inline-note">当前为信任用户内测包，未使用 Apple Developer ID 签名，也未通过 Apple 公证。首次打开可能需要你在系统设置中确认。</p>','info')+disclosure('本机处理与联网范围','<p class="inline-note">本地转录与本地配音在本机处理。链接下载、主页采集、直播、模型下载、检查更新，以及主动选择的云端模型和飞书保存会联网。使用云端模型前会告知上传内容与账户计费；工作台不会自动上传你的文稿。</p>');
 }
 
 function openModal(title, description, content, footer = '', wide = false) {
@@ -240,11 +242,11 @@ function closeModal(immediate = false) {
   modalAnimation=modal.animate([presentation,{opacity:0,transform:'translateY(4px) scale(.985)'}],{duration:130,easing:'cubic-bezier(.4,0,1,1)'});modalAnimation.onfinish=finish;
 }
 function showNotification() {
-  openModal('任务提醒预览','批量处理只在这一批结束时汇总提醒。',`<div class="notification-card"><div class="notification-app"><img src="../shared/lulu.png" alt="">LULU<span style="margin-left:auto">现在</span></div><strong>任务已完成</strong><p>打开 Lulu 查看处理结果。</p></div><p class="mini-note">这里展示固定隐私文案，不调用系统通知，也不播放声音。详细数量与失败原因留在任务区。</p>`,btn('了解提醒规则','notification-rules',{kind:'quiet'})+btn('看到了','close-modal',{kind:'primary'}));
+  openModal('任务提醒预览','批量处理只在这一批结束时汇总提醒。',`<div class="notification-card"><div class="notification-app"><img src="../shared/lulu.png" alt="">Paul工作台<span style="margin-left:auto">现在</span></div><strong>任务已完成</strong><p>打开 Paul工作台 查看处理结果。</p></div><p class="mini-note">这里展示固定隐私文案，不调用系统通知，也不播放声音。详细数量与失败原因留在任务区。</p>`,btn('了解提醒规则','notification-rules',{kind:'quiet'})+btn('看到了','close-modal',{kind:'primary'}));
 }
 function searchItems(){return [
   ['general','font-size','界面字号','标准、较大、更大，阅读与排版'],['general','awake','任务期间保持 Mac 唤醒','防休眠、处理任务、录制'],['general','notification-time','何时通知','任务完成提醒、后台通知'],['general','notification-events','通知哪些情况','完成、失败、需要处理'],['general','notification-sound','通知声音','提示音、安静'],['general','permissions','系统权限','麦克风、系统声音、通知授权'],
-  ...state.paths.map(p=>['storage',`path-${p.id}`,p.title,`存储 文件位置 路径 ${p.hint}`]),['storage','managed-locations','Lulu 管理的资料','文稿、音频、会话、直播录像、技能目录'],['skills','','技能安装与管理','skill 本地导入、启用、卸载、恢复'],['cli','cli-connection','连接外部 Agent','CLI、Skill、安装提示词、命令、Obsidian、主页采集、RSS'],['feishu','','连接飞书知识库','应用凭据、App ID、安全回调、账号授权'],['about','software-update','软件更新','版本、自动检查、下载、安装'],['about','','作者与联系方式','兆基、微信、GitHub']
+  ...state.paths.map(p=>['storage',`path-${p.id}`,p.title,`存储 文件位置 路径 ${p.hint}`]),['storage','managed-locations','工作台管理的资料','文稿、音频、会话、直播录像、技能目录'],['skills','','技能安装与管理','skill 本地导入、启用、卸载、恢复'],['cli','cli-connection','连接外部 Agent','CLI、Skill、安装提示词、命令、Obsidian、主页采集、RSS'],['feishu','','连接飞书知识库','应用凭据、App ID、安全回调、账号授权'],['about','software-update','软件更新','版本、自动检查、下载、安装']
 ];}
 function searchSettings(query) {
   if(!query.trim()){navigate(state.page,'',false);return;}
@@ -609,8 +611,7 @@ document.addEventListener('click',async event=>{
     if (await perform('feishu_disconnect')) closeModal();
     return;
   }
-  if (action==='contact') return openModal('联系方式','作者 · 兆基','<img class="contact-image" src="assets/contact.jpg" alt="作者联系方式">',btn('完成','close-modal',{kind:'primary'}));
-  if (action==='copy-version') return copyText(`Lulu ${state.meta.version} · ${state.meta.build}`);
+  if (action==='copy-version') return copyText(`Paul工作台 ${state.meta.version} · ${state.meta.build}`);
   if (action==='install-update') return openModal('安装并重启？','Lulu 会在检查通过后重启并安装更新。',
     '',btn('稍后','close-modal')+btn('安装并重启','install-confirm',{kind:'primary'}));
   if (['check-update','download-update','pause-update','install-confirm','manual-update'].includes(action)) {

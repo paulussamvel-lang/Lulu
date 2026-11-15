@@ -11,6 +11,7 @@ from .. import library
 from . import documents
 from .store import WorkspaceStore, encode, identity
 from .operations import ExpansionOperations
+from .editorial import EditorialOperations
 
 
 OPERATIONS = frozenset({"list", "bootstrap", "library_view", "open", "create_document", "save", "receipt", "recover_draft", "view_state",
@@ -29,6 +30,8 @@ OPERATIONS = OPERATIONS | frozenset({'order_folders', 'export_document', 'save_o
     'rss_fetch', 'rss_feeds', 'rss_select', 'collect_prepare', 'collect_history', 'collect_select', 'collect_export'})
 OPERATIONS = OPERATIONS | frozenset({'control_poll', 'control_show', 'settings_show', 'settings_apply', 'models_list', 'models_action', 'updates', 'batch_download'})
 OPERATIONS = OPERATIONS | frozenset({'batch_stage', 'batch_configure', 'batch_control', 'batch_poll'})
+OPERATIONS = OPERATIONS | frozenset({'editorial_list', 'editorial_show', 'editorial_candidate',
+                                    'editorial_create', 'editorial_add_candidate'})
 
 
 def _conversation_task_payloads(conversation_id, runner):
@@ -83,7 +86,7 @@ def _remove_conversation_task_payloads(paths):
         path.unlink()
 
 
-class WorkspaceService(ExpansionOperations):
+class WorkspaceService(ExpansionOperations, EditorialOperations):
     def __init__(self, store=None, runtime=None, origin="gui"):
         self._store = store
         self.runtime = runtime
@@ -307,8 +310,14 @@ class WorkspaceService(ExpansionOperations):
             raise RuntimeError('后台转录需要通过 Lulu Core 运行，请使用正式程序的工作区入口')
         return self.runtime.workspace_media()
 
-    def prepare_media(self, conversation_id, request_id, source_path, engine):
-        return self._media().prepare(conversation_id, request_id, source_path, engine)
+    def prepare_media(self, conversation_id, request_id, source_path, engine, speaker_document_id=None):
+        """Prepare local ASR, or speaker-only linking of the current saved MOSS document.
+
+        Explicit speaker_document_id preserves words and clocks, matches voices
+        over the whole source recording, and saves a separate document.
+        """
+        return self._media().prepare(conversation_id, request_id, source_path, engine,
+                                     speaker_document_id=speaker_document_id)
 
     def start_media(self, plan_id, expected_hash):
         return self._media().start(plan_id, expected_hash, origin=self.origin)

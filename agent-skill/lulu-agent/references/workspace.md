@@ -1,5 +1,24 @@
 # 文稿、会话和技能：当前工作区 CLI
 
+## 文案精选：选题与候选文案
+
+`editorial.*` connects to the real 文案精选 store, separate from 文稿库. Discover WS-88–WS-92 and `tools catalog` first. If the installed App lacks these capabilities, report the missing interface; do not edit its JSON directly or assume a document save filled the candidate list.
+
+All commands use the existing `workspace <group> <verb> --request <absolute-json-file> --output json` grammar, with `group=editorial`:
+
+| Verb | Request | Result |
+| --- | --- | --- |
+| `list` | optional `search, offset, limit` (1–100) | workspace `revision`, paged `projects` and `has_more` |
+| `show` | `project_id` | current `revision`, topic metadata and candidate summaries |
+| `candidate` | `project_id, candidate_id` | complete candidate copy, source and content hash |
+| `create` | `request_id, title, expected_revision`, optional `audience` | topic ID and committed revision |
+| `add-candidate` | `request_id, project_id, expected_revision`, plus one source below | candidate ID, content hash and committed revision |
+
+To add new text, pass `title, text` (nonempty, at most 160 title characters / 1 MiB UTF-8 body). To copy an existing manuscript, pass `document_id, expected_document_revision, expected_document_hash` from `documents.show`, omit `text`, and optionally provide a shorter `title`. These modes are mutually exclusive. Optional `selected` is a boolean, default true. Each write preserves the source manuscript, existing candidates, clips and assembled draft. It performs no scoring, inference, cloud upload or download.
+
+Read the exact target's `project_id` and workspace `revision` before writing; never guess from a similarly named topic. New topics use the latest `list` revision. Reuse the same `request_id` and identical parameters after an uncertain reply; its durable receipt prevents duplicates, even after a restart. CONFLICT requires reading current state before a new operation; never overwrite or silently retry with invented revisions. The visible window refreshes saved CLI additions while preserving local edits; reads return full text rather than scoring summaries.
+
+
 先按 SKILL.md 完成安装校验，并读 `capabilities --output json`。此文档描述新版源码接口；只有当前安装清单中 `available` 且 `executable=true` 的能力才可调用。不要用版本号猜测能力。旧安装缺少新接口时告知需要匹配版本，不导入源码或绕过 Core。
 
 ## 发现参数

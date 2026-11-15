@@ -36,10 +36,10 @@ def main() -> int:
         parser.error("--product-source-sha256 必须是64位小写十六进制SHA-256")
 
     payload = {
-        "project": "Lulu",
+        "project": "Paul工作台",
         "package_version": args.version,
-        "author": "兆基",
-        "copyright": "Copyright © 2026 兆基. Lulu.",
+        "maintainer": "Paul",
+        "upstream_license": "LICENSE",
         "build_time_utc": args.build_time,
         "build_git_commit": args.git_commit,
         "build_profile": args.build_profile,
@@ -47,7 +47,7 @@ def main() -> int:
         "source_commit": args.source_commit,
         "source_tree": args.source_tree,
         "product_source_sha256": args.product_source_sha256,
-        "purpose": "作者归属元数据/取证水印",
+        "purpose": "构建来源与完整性元数据",
         "boundary": "不构成 DRM、加密、反逆向或法律登记。",
         "privacy_note": "本声明不包含凭据、用户目录、钥匙串或用户数据。",
     }

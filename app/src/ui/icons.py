@@ -205,6 +205,7 @@ def rounded_logo(path: str, size: int, radius: int = 11) -> QPixmap:
 
 def icon_label(name: str, color: str, size: int = 18, stroke: float = 2.0) -> QLabel:
     lab = QLabel()
+    lab._paul_icon = (name, color, size, stroke)
     lab.setPixmap(pixmap(name, color, size, stroke))
     lab.setFixedSize(size, size)
     lab.setAlignment(Qt.AlignCenter)
@@ -246,7 +247,7 @@ def image_label(path: str, size: int = 18) -> QLabel:
     return lab
 
 
-# 互动数据图标：兆基提供的彩色 PNG；白色线稿（评论/转发）按 alpha 上色成可见色。
+# 互动数据图标：彩色 PNG；白色线稿（评论/转发）按 alpha 上色成可见色。
 _STAT_ICON = {
     "like": ("stat_like.png", None),            # 红心
     "favorite": ("stat_favorite.png", None),    # 金星

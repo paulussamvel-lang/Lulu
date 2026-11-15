@@ -92,6 +92,11 @@ COMMANDS.update({
     'batches.configure': ('WS-85', 'batch_configure', 'local_write'),
     'batches.control': ('WS-86', 'batch_control', 'network_or_local_or_cloud_inference'),
     'documents.trash-system': ('WS-87', 'system_delete', 'local_write'),
+    'editorial.list': ('WS-88', 'editorial_list', 'read'),
+    'editorial.show': ('WS-89', 'editorial_show', 'read'),
+    'editorial.candidate': ('WS-90', 'editorial_candidate', 'read'),
+    'editorial.create': ('WS-91', 'editorial_create', 'local_write'),
+    'editorial.add-candidate': ('WS-92', 'editorial_add_candidate', 'local_write'),
 })
 
 CAPABILITIES=frozenset(item[0] for item in COMMANDS.values())

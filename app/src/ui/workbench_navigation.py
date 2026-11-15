@@ -95,15 +95,18 @@ class WorkbenchNavigation(QFrame):
             pill = self.indicator.adjusted(1, 1, -1, -1)
             radius = 10
             painter.setPen(Qt.PenStyle.NoPen)
-            wash = QColor(self.theme.accent); wash.setAlphaF(.07)
+            wash = QColor(self.theme.rail_selected or self.theme.accent)
+            if not self.theme.rail_selected:
+                wash.setAlphaF(.07)
             painter.setBrush(wash)
             painter.drawRoundedRect(pill, radius, radius)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(self.theme.accent))
+            painter.setBrush(QColor(self.theme.rail_foreground or self.theme.accent))
             marker = QRectF(pill.left()+6, pill.center().y()-7, 2.5, 14)
-            painter.drawRoundedRect(marker, 1.25, 1.25)
+            if not self.theme.rail_background:
+                painter.drawRoundedRect(marker, 1.25, 1.25)
         if self.keyboard_focus is not None and self.keyboard_focus.hasFocus():
             focus = QRectF(self.keyboard_focus.geometry()).adjusted(2.5, 2.5, -2.5, -2.5)
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(QColor(self.theme.accent), 1, Qt.PenStyle.DotLine))
+            painter.setPen(QPen(QColor(self.theme.rail_foreground or self.theme.accent), 1, Qt.PenStyle.DotLine))
             painter.drawRoundedRect(focus, 10, 10)

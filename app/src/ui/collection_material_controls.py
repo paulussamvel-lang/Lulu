@@ -6,6 +6,7 @@ from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
 from . import icons
+from .scoped_events import scoped_dialog_filter
 
 
 class MaterialCell(QWidget):
@@ -85,7 +86,7 @@ class MaterialCell(QWidget):
 class CollectionEditorPopup(QFrame):
     """A non-modal anchored editor. Nested select/calendar popups stay usable."""
     def __init__(self, owner, title, width=560):
-        super().__init__(owner, Qt.Tool | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        super().__init__(owner, Qt.Popup | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
         self.owner = owner
         self.setObjectName('collectionEditorPopup')
         self.setAccessibleName(title)
@@ -118,11 +119,11 @@ class CollectionEditorPopup(QFrame):
         self.raise_()
 
     def showEvent(self, event):  # noqa: N802
-        QApplication.instance().installEventFilter(self)
+        scoped_dialog_filter(self)
         super().showEvent(event)
 
     def hideEvent(self, event):  # noqa: N802
-        QApplication.instance().removeEventFilter(self)
+        scoped_dialog_filter(self, False)
         super().hideEvent(event)
 
     def eventFilter(self, obj, event):
@@ -132,7 +133,7 @@ class CollectionEditorPopup(QFrame):
             self.hide()
         if obj is self.owner.window() and event.type() in {QEvent.Move, QEvent.Resize, QEvent.Hide, QEvent.Close}:
             self.hide()
-        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape and QApplication.activePopupWidget() is None:
+        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape and QApplication.activePopupWidget() in (None, self):
             self.hide()
             if self._anchor:
                 self._anchor.setFocus()

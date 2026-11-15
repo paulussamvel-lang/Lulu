@@ -31,6 +31,7 @@ addict>=2.4.0
 
 # 云端 ASR API(可选引擎):HTTP 请求 + API Key 安全存储
 requests>=2.31
+httpx==0.28.1       # 文稿助手与文案评分的流式模型连接
 keyring>=25.0        # 跨平台:mac 钥匙串 / Windows 凭据管理器 / Linux Secret Service
 dashscope>=1.20      # 阿里云百炼 Paraformer 实时识别(本地 wav 直读)
 # 已由 dashscope 安装的现有网络组件；直播弹幕直接复用，不增加运行环境。

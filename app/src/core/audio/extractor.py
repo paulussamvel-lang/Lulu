@@ -1,11 +1,11 @@
 """音频来源解析:本地文件直通 + 链接下载。
 
 链接下载是 CLAUDE.md 允许的唯一联网例外,且必须隔离、可关闭(见 ADR-0004):
-- 不登录、不带任何浏览器/账号 cookie、只取公开作品。
+- 通用链接匿名读取；抖音按用户选择的助手方式使用 Lulu 专用浏览器。
 - enable_link_download=False 时,任何链接输入都会被拒绝,转录链路完全不碰网络。
 
-抖音链接走专用解析器(解析公开分享页内嵌的 _ROUTER_DATA 拿播放直链,无登录、无签名),
-其它通用链接交给 yt-dlp。
+抖音下载优先使用浏览器当前作品数据与画质地址，登录或验证由用户本人完成；
+匿名分享页解析器保留为独立入口。其它通用链接交给 yt-dlp。
 """
 
 from __future__ import annotations
@@ -254,7 +254,7 @@ def resolve_source(
             )
         work_dir.mkdir(parents=True, exist_ok=True)
         if is_douyin(url):
-            return _download_douyin(url, work_dir, progress, meta)
+            return _download_douyin(url, work_dir, progress, meta, use_helper=True)
         if is_cancelled is not None:
             from .download_process import download_in_process
             return download_in_process(url, work_dir, progress, meta,
@@ -748,15 +748,23 @@ def safe_filename(name: str, fallback: str = "media", maxlen: int = 60) -> str:
 
 
 def _download_douyin(share_url: str, work_dir: Path, progress: ProgressCallback,
-                     meta: dict | None = None) -> Path:
-    (
+                     meta: dict | None = None, *, use_helper=False) -> Path:
+    if use_helper:
+        from ..collect.download_helper import resolve_video
+        info = resolve_video(share_url, progress)
+        play_url, desc, stats, author, cover_work_id, cover_url = (
+            info['urls'][0], info['title'], info['stats'], info['author'], info['work_id'], info['cover'])
+        if meta is not None:
+            meta['download_method'] = 'douyin-browser-helper'
+    else:
+        (
         play_url,
         desc,
         stats,
         author,
         cover_work_id,
         cover_url,
-    ) = _douyin_play_url(share_url, progress, meta)
+        ) = _douyin_play_url(share_url, progress, meta)
     if meta is not None:
         _apply_douyin_work_meta(
             meta,
@@ -794,8 +802,10 @@ def _download_douyin(share_url: str, work_dir: Path, progress: ProgressCallback,
         progress(f"作品:{desc[:30]}…", -1.0)
     # 用作品文案命名,保留时文件名更有意义
     dst = work_dir / f"{safe_filename(desc, 'douyin_media')}.mp4"
+    candidates = info['urls'] if use_helper else [play_url]
     last_error = ""
-    for attempt in range(len(_MOBILE_UAS)):
+    for attempt in range(max(len(_MOBILE_UAS), len(candidates))):
+        play_url = candidates[min(attempt, len(candidates) - 1)]
         progress("准备下载抖音作品…", -1.0)
         if dst.exists():
             dst.unlink()

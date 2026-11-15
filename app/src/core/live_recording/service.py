@@ -258,6 +258,9 @@ class LiveService:
             if operation == 'comments_setting':
                 self.index.set_setting('comments_enabled', '1' if arguments['enabled'] else '0')
                 return {'enabled': arguments['enabled']}
+            if operation == 'quality_setting':
+                self.index.set_setting('quality', arguments['quality'])
+                return {'quality': arguments['quality']}
             if operation == 'credential':
                 if self.busy():
                     raise LiveError('请先暂停全部直播监控，再更换或清除登录')
@@ -1124,6 +1127,7 @@ class LiveService:
             self.index.write('UPDATE recordings SET comments_enabled=?,comments_state=? WHERE id=?',
                              (int(comments_enabled), 'connecting' if comments_enabled else 'disabled', rid))
             monitor.update(job_id=jid, directory=str(folder), recording_id=rid, started=time.time(),
+                           quality=self.index.setting('quality', 'origin'),
                            last_data_at=time.monotonic(), recording_state='connecting', clock_duration=0,
                            clock_base=0, comments_origin=time.monotonic())
             monitor.pop('data_limit', None)
@@ -1176,10 +1180,19 @@ class LiveService:
                  value['bytes'], 1, valid, value['sha256']))
 
     @staticmethod
-    def _choice(value, failures):
+    def _choice(value, failures, quality='origin'):
         streams = value.streams
         if not streams:
             return None
+        if quality != 'origin':
+            levels = {'origin': 4, 'uhd': 3, 'full_hd1': 3, 'hd': 2, 'hd1': 2,
+                      'sd': 1, 'sd1': 1, 'ld': 0, 'sd2': 0}
+            target = {'1080p': 3, '720p': 2, '540p': 1}.get(quality, 4)
+            known = [s for s in streams if s.quality.lower() in levels]
+            if known:
+                lower = [s for s in known if levels[s.quality.lower()] <= target]
+                selected = max((levels[s.quality.lower()] for s in lower), default=min(levels[s.quality.lower()] for s in known))
+                streams = tuple(s for s in known if levels[s.quality.lower()] == selected)
         bitrates = sorted({s.bitrate for s in streams}, reverse=True)
         level = min(max(0, (failures - 4) // 2), len(bitrates) - 1)
         choices = [s for s in streams if s.bitrate == bitrates[level]]
@@ -1216,7 +1229,7 @@ class LiveService:
                         if monitor['cancel'].is_set() or not self._can_run(token):
                             break
                         self.control.verify_worker_lease(jid, lease_token=lease, mutation_kind='file')
-                    producer = self.producer_factory(self.ffmpeg, self._choice(value, failures),
+                    producer = self.producer_factory(self.ffmpeg, self._choice(value, failures, monitor.get('quality', 'origin')),
                         monitor['directory'], start_number=max(numbers, default=-1) + 1)
                     self._owned(monitor, producer.process)
                     with self.lock:
@@ -1638,6 +1651,7 @@ class LiveService:
             'hosts': count_hosts, 'recordings': count_records, 'directory': self.output_dir(),
             'credential': bool(self.index.setting('credential')), 'login': self._login_state(), 'active': self.busy(),
             'comments_enabled': self.index.setting('comments_enabled', '1') == '1',
+            'quality': self.index.setting('quality', 'origin'),
             'attention_keys': [f"{row['id']}:{row['status']}:{row['live_error']}" for row in
                 self.index.all("SELECT id,status,live_error FROM hosts WHERE "
                                "status IN ('disk_full','write_error','recovery_required') "

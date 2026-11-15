@@ -19,13 +19,14 @@ from .cli_info import (
 )
 from .indextts2_settings import reduced_motion
 from .settings_page import (
-    AUTHOR_URL, REPOSITORY_URL, SettingsPage, StorageRelocateWorker, _PATH_OPTIONS,
+    SettingsPage, StorageRelocateWorker, _PATH_OPTIONS,
     _SettingsReadWorker, _start_settings_read,
 )
 from .skills_page import LocalSkillDropZone
 from .update_ui import _state_presentation, _development_update
 
 _PREFS = {
+    'theme': 'theme',
     'font': 'interface_font_percent', 'awake': 'prevent_sleep_during_tasks',
     'notification': 'notification_policy', 'completed': 'notify_on_completion',
     'failed': 'notify_on_failure', 'attention': 'notify_on_attention',
@@ -41,7 +42,7 @@ _PERMISSION_PANES = {
     'microphone': 'com.apple.preference.security?Privacy_Microphone',
     'system': 'com.apple.preference.security?Privacy_ScreenCapture',
 }
-_EXTERNAL = {REPOSITORY_URL, AUTHOR_URL, AGENT_SKILL_REPOSITORY_URL, feishu.DEV_CONSOLE_URL, 'https://open.feishu.cn/app'}
+_EXTERNAL = {AGENT_SKILL_REPOSITORY_URL, feishu.DEV_CONSOLE_URL, 'https://open.feishu.cn/app'}
 
 
 def _update(snapshot):
@@ -132,8 +133,7 @@ class ApprovedSettings(SettingsPage):
         self.permission_status.connect(self._publish_permission)
         self.approved = SettingsView(
             self, 'settings',
-            ('preview.css','controls.css','embedded.css','controls.js','settings.js',
-             'assets/contact.jpg'),
+            ('preview.css','controls.css','embedded.css','controls.js','settings.js'),
             ('channel.js','lulu.png','paper.png',), self._opened,
             {
                 'category':self._category, 'sidebar_width':self._sidebar_width,
@@ -171,7 +171,7 @@ class ApprovedSettings(SettingsPage):
 
     def _prefs(self):
         return {
-            key: getattr(self.cfg, field, 100 if key == 'font' else 'never' if key == 'notification' else False)
+            key: getattr(self.cfg, field, 100 if key == 'font' else 'never' if key == 'notification' else 'warm' if key == 'theme' else False)
             for key, field in _PREFS.items()
         }
 
@@ -282,6 +282,10 @@ class ApprovedSettings(SettingsPage):
                 raise ValueError('字号无效')
             self._pending_font = None
             self._font_timer.stop()
+        elif key == 'theme':
+            from ..appearance import PALETTES
+            if type(value) is not str or value not in {'warm', *PALETTES}:
+                raise ValueError('配色选择无效')
         elif key == 'notification':
             if value not in {'always','inactive','never'}:
                 raise ValueError('通知时机无效')

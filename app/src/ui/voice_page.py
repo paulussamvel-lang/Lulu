@@ -105,6 +105,7 @@ from .glossary_panel import GlossaryPanel
 from .consumer_select import ConsumerSelect
 from .document_source_controls import PaperEnvelopePicker as _PaperEnvelopePicker
 from . import voice_result_style as result_style
+from .scoped_events import scoped_dialog_filter, dismiss_deactivated
 from .voice_wave_slider import VoiceWaveSlider
 from .widgets import ElideLabel, FileDropArea
 from .waveform import WaveformSelector
@@ -695,7 +696,7 @@ QPushButton[voiceSourceChoice="true"][current="true"] {{ background:{T.TERRA_WAS
         super().showEvent(event)
         app = QApplication.instance()
         if app is not None:
-            app.installEventFilter(self)
+            scoped_dialog_filter(self)
         parent = self.parentWidget()
         if parent is not None:
             target = parent.window()
@@ -714,7 +715,7 @@ QPushButton[voiceSourceChoice="true"][current="true"] {{ background:{T.TERRA_WAS
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt API
         app = QApplication.instance()
         if app is not None:
-            app.removeEventFilter(self)
+            scoped_dialog_filter(self, False)
         if (
             self._blur_target is not None
             and self._blur_effect is not None
@@ -726,6 +727,7 @@ QPushButton[voiceSourceChoice="true"][current="true"] {{ background:{T.TERRA_WAS
         super().closeEvent(event)
 
     def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt API
+        dismiss_deactivated(self, watched, event, self.close)
         if event.type() == QEvent.MouseButtonPress and self.isVisible():
             if not self.frameGeometry().contains(event.globalPosition().toPoint()):
                 self.close()
@@ -753,10 +755,11 @@ class _DialogBackdrop(QObject):
             self.shell.setGraphicsEffect(self.effect)
         app = QApplication.instance()
         if app is not None:
-            app.installEventFilter(self)
+            scoped_dialog_filter(self)
         dialog.finished.connect(self.cleanup)
 
     def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt API
+        dismiss_deactivated(self.dialog, watched, event, self.dialog.reject)
         if event.type() == QEvent.MouseButtonPress and self.dialog.isVisible():
             if not self.dialog.frameGeometry().contains(event.globalPosition().toPoint()):
                 self.dialog.reject()
@@ -765,7 +768,7 @@ class _DialogBackdrop(QObject):
     def cleanup(self, *_args) -> None:
         app = QApplication.instance()
         if app is not None:
-            app.removeEventFilter(self)
+            scoped_dialog_filter(self, False)
         if self.effect is not None and self.shell.graphicsEffect() is self.effect:
             self.shell.setGraphicsEffect(None)
         self.effect = None
@@ -869,7 +872,7 @@ class _VoiceLibraryModal(QDialog):
         self._fit_to_shell()
         app = QApplication.instance()
         if app is not None:
-            app.installEventFilter(self)
+            scoped_dialog_filter(self)
         super().showEvent(event)
         self.raise_()
         self.activateWindow()
@@ -885,6 +888,7 @@ class _VoiceLibraryModal(QDialog):
         super().keyPressEvent(event)
 
     def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt API
+        dismiss_deactivated(self, watched, event, self.reject)
         if self.property("childWorkflow"):
             return super().eventFilter(watched, event)
         if watched is self.shell and event.type() in (QEvent.Move, QEvent.Resize):
@@ -929,7 +933,7 @@ class _VoiceLibraryModal(QDialog):
         self._cleaned_up = True
         app = QApplication.instance()
         if app is not None:
-            app.removeEventFilter(self)
+            scoped_dialog_filter(self, False)
         self.backdrop.hide()
         self.backdrop.deleteLater()
         if (
@@ -2236,6 +2240,9 @@ QLabel#srcEmpty {{ font-size:12px; color:{T.INK_FAINT}; }}
         QTimer.singleShot(0, self._reflow_indextts2_workbench)
 
     def _reflow_indextts2_workbench(self) -> None:
+        from shiboken6 import isValid
+        if not isValid(self) or (hasattr(self, "page_scroll") and not isValid(self.page_scroll)):
+            return
         self._sync_page_header_layout()
         if hasattr(self, "_approved_index"):
             self._approved_index.reflow()

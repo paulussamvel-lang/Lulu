@@ -42,6 +42,7 @@ APP_NAME = PROFILE_META["app_name"]
 VERSION_SOURCE = runpy.run_path(os.path.join(os.path.dirname(SPECPATH), "src", "version.py"))
 PACKAGE_VERSION = VERSION_SOURCE["__version__"]
 PACKAGE_BUILD = VERSION_SOURCE["__build__"]
+WORKSPACE_NAME = runpy.run_path(str(Path(SPECPATH).parent / "src/branding.py"))["WORKSPACE_NAME"]
 # PyInstaller 在 spec 里注入 SPECPATH = spec 文件所在目录(即 app/packaging)
 APP_DIR = os.path.dirname(SPECPATH)                  # app/
 ENTRY = os.path.join(APP_DIR, PROFILE_META["entry"])
@@ -70,6 +71,20 @@ PROFILE_GATE = runpy.run_path(os.path.join(SPECPATH, "profile_gate.py"))
 PRIVACY_GATE = runpy.run_path(os.path.join(SPECPATH, "privacy_gate.py"))
 
 datas, binaries, hiddenimports = [], [], []
+
+# Small, pinned speaker-only auxiliary component. ASR/TTS weights remain external.
+# This component makes global linking offline and does not replace MOSS weights.
+speaker_model = Path(APP_DIR) / 'build/global-speakers/campplus_cn_common.bin'
+if (not speaker_model.is_file() or speaker_model.is_symlink()
+        or speaker_model.stat().st_size != 28036335
+        or hashlib.sha256(speaker_model.read_bytes()).hexdigest()
+        != '3388cf5fd3493c9ac9c69851d8e7a8badcfb4f3dc631020c4961371646d5ada8'):
+    raise SystemExit('Missing verified CAM++ speaker component; see packaging/SPEAKER_COMPONENT.md')
+datas.append((str(speaker_model), 'speaker-runtime'))
+datas.append((str(Path(APP_DIR) / 'packaging/SPEAKER_COMPONENT.md'), 'speaker-runtime'))
+if BUILD_IDENTITY != "experience":
+    for locale in ("en", "zh-Hans", "zh_CN"):
+        datas.append((str(Path(SPECPATH) / "workspace-localization/InfoPlist.strings"), locale + ".lproj"))
 system_audio_helper = Path(os.environ.get("LULU_SYSTEM_AUDIO_HELPER_FOR_SPEC", ""))
 if not system_audio_helper.is_file() or not os.access(system_audio_helper, os.X_OK):
     raise SystemExit("构建缺少已编译的系统声音录制组件")
@@ -194,6 +209,7 @@ datas += [(os.path.join(APP_DIR, "src", "ui", "agent_workspace", "assets"), "src
 # 首版包作者归属元数据/取证水印:只作为 Resources 静态文件,不参与运行时逻辑。
 if os.path.exists(AUTHORSHIP):
     datas += [(AUTHORSHIP, ".")]
+datas += [(str(Path(APP_DIR).parent / "LICENSE"), ".")]
 
 # Free official builds contain no legacy license endpoint configuration.
 if BUILD_PROFILE == "external_candidate" and os.path.exists(UPDATE_PUBLIC_KEY):
@@ -466,7 +482,7 @@ app = BUNDLE(
     bundle_identifier=PROFILE_META["bundle_id"],
     info_plist={
         "CFBundleName": APP_NAME,
-        "CFBundleDisplayName": APP_NAME,
+        "CFBundleDisplayName": WORKSPACE_NAME if BUILD_IDENTITY != "experience" else APP_NAME,
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "15.0",
         "CFBundleShortVersionString": PACKAGE_VERSION,
@@ -474,8 +490,8 @@ app = BUNDLE(
         "LuluBuildProfile": BUILD_PROFILE,
         "LuluBuildIdentity": BUILD_IDENTITY,
         "LuluUploadTarget": PROFILE_META["upload_target"],
-        "CFBundleGetInfoString": f"{APP_NAME} {PACKAGE_VERSION} ({PACKAGE_BUILD}) · 作者:兆基 · 2026",
-        "NSHumanReadableCopyright": "Copyright © 2026 兆基. Lulu.",
+        "CFBundleGetInfoString": f"{WORKSPACE_NAME} {PACKAGE_VERSION} ({PACKAGE_BUILD})",
+        "NSHumanReadableCopyright": "原始版权及许可见随包 LICENSE。",
         # 麦克风录音权限说明(缺这条 macOS 会直接杀进程)
         "NSMicrophoneUsageDescription": "Lulu 需要使用麦克风来录制音频并转写为文字(录音只在本机处理)。",
         "NSAudioCaptureUsageDescription": "Lulu 需要录制电脑播放的声音，用于你选择的本地录音。",

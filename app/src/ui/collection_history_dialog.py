@@ -409,11 +409,20 @@ class _MoveRecords(QThread):
 
 
 class _HistoryFontWatcher(QObject):
-    def eventFilter(self, watched, event):
-        if (watched is QApplication.instance() and event.type() == QEvent.Type.DynamicPropertyChange
-                and event.propertyName() == b'luluFontPercent'):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.percent = None
+        T.font_scale_notifier().changed.connect(self._changed)
+
+    def _changed(self, _percent):
+        if self.parent().isVisible():
+            self._poll()
+
+    def _poll(self):
+        percent = QApplication.instance().property('luluFontPercent')
+        if percent != self.percent:
+            self.percent = percent
             self.parent()._font_scale_timer.start(0)
-        return False
 
 
 class CollectionHistoryDialog(QFrame):
@@ -848,7 +857,7 @@ QFrame#collectionHistoryOverlay QScrollBar::sub-line:vertical {{
         self._focus_first_control()
 
     def showEvent(self, event) -> None:  # noqa: N802 - Qt API
-        QApplication.instance().installEventFilter(self._font_watcher)
+        self._font_watcher._poll()
         self._sync_text_scale()
         parent = self.parentWidget()
         if parent is not None:
@@ -861,7 +870,6 @@ QFrame#collectionHistoryOverlay QScrollBar::sub-line:vertical {{
         super().showEvent(event)
 
     def hideEvent(self, event):
-        QApplication.instance().removeEventFilter(self._font_watcher)
         self._font_scale_timer.stop()
         super().hideEvent(event)
 

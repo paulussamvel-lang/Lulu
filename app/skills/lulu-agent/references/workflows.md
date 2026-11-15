@@ -79,6 +79,17 @@ prepare 不创建任务；run 通过现有本地引擎执行，结果包含 job_
 
 用户要求“转成文稿后总结/改稿”时，也可使用 [workspace.md](workspace.md) 的会话内任务：新建或选定文稿和会话 → tasks prepare → tasks start → tasks show → documents show。此路径支持同样四个模型，完成后另存新文稿；不覆盖原稿。普通 jobs 和 workspace tasks 使用不同参数，先读取 tools catalog，不猜字段。
 
+### 整场说话人编号
+
+当实际 tools catalog 中 tasks.prepare 明确包含 speaker_document_id 时，用户可对当前
+未修改且带时间轴的 MOSS 文稿显式执行整场声纹匹配。提供该文稿的会话、文稿 ID、
+对应原录音 source_path 和原引擎 local_moss_q5；tasks.start/show/cancel/recover 沿用
+原有后台任务边界。此操作仅运行随包、固定摘要的 CAM++ 声纹组件，不重新识别文字，
+不下载模型，不上传录音。结果另存新文稿；原稿、原录音、重复发言和时间点保留。
+documents.show 的 meta.diarization_scope=recording 表示整场匹配；speaker_count 是
+声纹聚类数，speaker_unresolved_turns 是证据不足的发言段数。极短或重叠发言可能标为
+“发言人待确认”，不猜姓名或按发言顺序硬配身份。缺少上述实际参数时不调用此路径。
+
 ## Confirmation or human handoff
 
 For confirmation, display the exact capability, effect, target, account/tenant, idempotency, and artifact summary. Request trusted GUI or OS human presence. The Agent cannot answer its own prompt. For GUI-only work, stop with the GUI entry and do not synthesize an equivalent command.

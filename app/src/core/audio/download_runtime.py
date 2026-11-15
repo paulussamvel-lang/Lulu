@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 from urllib.parse import urlsplit
 
-VERSIONS = {"yt-dlp": "2026.8.19", "yt-dlp-ejs": "0.8.0", "deno": "2.9.5"}
+VERSIONS = {"yt-dlp": "2026.10.26", "yt-dlp-ejs": "0.8.0", "deno": "2.9.5"}
 
 
 class DownloadFailure(RuntimeError):
@@ -57,8 +57,11 @@ def public_download_options(url):
     options = {
         "cookiefile": None, "cookiesfrombrowser": None, "usenetrc": False,
         "cachedir": False, "remote_components": set(), "logger": QuietDownloadLogger(),
+        "concurrent_fragment_downloads": 4,
+        "skip_unavailable_fragments": False,
     }
     host = (urlsplit(url).hostname or "").lower().rstrip(".")
     if host in {"youtube.com", "youtu.be"} or host.endswith(".youtube.com"):
+        options["concurrent_fragment_downloads"] = 8
         options["js_runtimes"] = {"deno": {"path": str(deno_path())}}
     return options

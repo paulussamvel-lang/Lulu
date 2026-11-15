@@ -1,17 +1,16 @@
-"""Lulu 宣纸的统一配色、字体、圆角、阴影与全局样式。
-
-保留旧控件使用的配色接口；所有旧主题名称均回到默认宣纸。
-"""
+"""Workbench palettes, fonts and native styles; preserve legacy control APIs."""
 
 from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication, QDialog, QGraphicsDropShadowEffect, QWidget
+from ..appearance import PALETTES
 
 
 def asset(name: str) -> str:
@@ -120,6 +119,10 @@ class ConsumerTheme:
     paper_texture_opacity: float = 0.0
     paper_rail_opacity: float = 0.0
     paper_queue_opacity: float = 0.0
+    rail_background: str = ''
+    rail_foreground: str = ''
+    rail_muted: str = ''
+    rail_selected: str = ''
 
     @property
     def surface_work(self) -> str:
@@ -218,6 +221,24 @@ CONSUMER_THEMES = {
     ),
 
 }
+
+
+for _name, _colors in PALETTES.items():
+    THEMES[_name] = replace(WARM, name=_name, BG=_colors['canvas'], BG_DEEP=_colors['alt'],
+        CARD=_colors['surface'], INK=_colors['ink'], INK_SOFT=_colors['muted'], INK_FAINT=_colors['muted'],
+        LINE=_colors['line'], LINE_SOFT=_colors['alt'], TERRA=_colors['accent'], TERRA_DEEP=_colors['hover'],
+        TERRA_SOFT=_colors['line'], TERRA_WASH=_colors['alt'],
+        GRAD_TOP=_colors['accent'], GRAD_HOVER_TOP=_colors['hover'], GRAD_HOVER_BOT=_colors['hover'],
+        HOVER_RAISE=_colors['surface'], DROP_BG=_colors['alt'], NAV_HOVER=_colors['alt'])
+    CONSUMER_THEMES[_name] = replace(CONSUMER_THEMES['warm'], name=_name,
+        canvas=_colors['canvas'], surface=_colors['surface'], surface_alt=_colors['alt'],
+        ink=_colors['ink'], ink_soft=_colors['muted'], ink_muted=_colors['muted'], line=_colors['line'],
+        accent=_colors['accent'], accent_hover=_colors['hover'], accent_wash=_colors['alt'],
+        accent_hairline=_colors['line'], accent_hairline_active=_colors['accent'],
+        secondary=_colors['alt'], secondary_hover=_colors['line'], paper_edge=_colors['surface'],
+        font_display=SANS, paper_canvas_opacity=0., paper_texture_opacity=0.,
+        paper_rail_opacity=0., paper_queue_opacity=0., rail_background=_colors['rail'],
+        rail_foreground=_colors['rail_text'], rail_muted=_colors['rail_muted'], rail_selected=_colors['rail_active'])
 
 
 def consumer_theme(name: str | None = None) -> ConsumerTheme:
@@ -942,6 +963,17 @@ class TextScaledDialog(QDialog):
         super().showEvent(event)
 
 
+class _FontScaleNotifier(QObject):
+    changed = Signal(int)
+
+
+def font_scale_notifier(app=None):
+    app = app or QApplication.instance()
+    if not hasattr(app, '_lulu_font_scale_notifier'):
+        app._lulu_font_scale_notifier = _FontScaleNotifier(app)
+    return app._lulu_font_scale_notifier
+
+
 def apply_fonts(app, percent: int = 100) -> None:
     app.setProperty('luluFontPercent', percent)
     f = QFont(SANS)
@@ -950,6 +982,7 @@ def apply_fonts(app, percent: int = 100) -> None:
     for widget in app.topLevelWidgets():
         if isinstance(widget, QDialog):
             _scale_dialog_text(widget, percent)
+    font_scale_notifier(app).changed.emit(percent)
 
 
 # 当前调色板固定为宣纸，兼容现有控件读取 ACTIVE 的接口。
@@ -999,6 +1032,28 @@ def apply_task_group_shadow(widget: QWidget, theme: ConsumerTheme) -> QWidget:
 # ——— 全局 QSS（按调色板生成）———
 # 切片3 起：渐变/hover 底/滚动条/拖拽区/气泡等原写死的字面色均已收口为主题 token;
 # 「强调底上的白字」（newBtn/grabBtn 的 color:#FFFFFF）保留现有取值。
+def workbench_palette_qss(t: ConsumerTheme) -> str:
+    if not t.rail_background:
+        return ''
+    styles = f'''
+QFrame#sidebar, QFrame#titlebarPaperLeft {{ background: {t.rail_background}; border: none; }}
+QFrame#sidebar QLabel {{ color: {t.rail_foreground}; background: transparent; }}
+QFrame#sidebar QLabel#navLabel {{ color: {t.rail_muted}; }}
+QFrame#sidebar QLabel#navText, QFrame#sidebar QLabel#navTextActive {{ color: {t.rail_foreground}; }}
+QFrame#sidebar QFrame[luluControl="navRow"] {{ border-left: none; }}
+QFrame#sidebar QFrame[luluControl="navRow"]:hover {{ background: {t.accent_hover}; }}
+QFrame#sidebar QFrame[luluControl="navRow"][consumerAccent="true"] {{ background: {t.rail_selected}; }}
+QFrame#sidebar QFrame#workbenchNavigation QFrame[luluControl="navRow"] {{ background: transparent; border: none; }}
+QFrame#sidebar QFrame#workbenchNavigation QFrame[luluControl="navRow"][selected="false"]:hover {{ background: {t.accent_hover}; }}
+QFrame#sidebar QLabel#workspaceBrandName {{ color: {t.rail_foreground}; font-family: "{t.font_body}"; }}
+QLabel#windowTitleLabel {{ font-family: "{t.font_body}"; }}
+QFrame#settingsTitlebarSidebar {{ background: {t.surface_alt}; border-color: {t.line}; }}
+'''
+    # Match the existing shell scope's specificity, including selected rows.
+    return styles.replace('QFrame#sidebar', 'QFrame#sidebar[consumerThemeScope="globalShell"]').replace(
+        'QFrame#titlebarPaperLeft', 'QFrame#titlebarPaperLeft[consumerThemeScope="globalShell"]')
+
+
 def build_qss(p: Palette) -> str:
     base = f"""
 * {{ font-family: "{SANS}"; color: {p.INK}; }}
@@ -1290,6 +1345,7 @@ QFrame#pickDivider {{ background: {p.LINE_SOFT}; margin-left: 54px; }}
         + build_consumer_global_shell_qss(consumer, p)
         + build_consumer_core_workspace_qss(consumer)
         + build_consumer_sample_qss(consumer)
+        + workbench_palette_qss(consumer)
     )
 
 

@@ -16,6 +16,10 @@ import tempfile
 # These are deliberately real behavior tests, not string/constant checks. Keep the
 # list small enough for every build while representing every high-risk user seam.
 CAPABILITY_TESTS = (
+    'tests.test_agent_workspace_media.MediaTests.test_long_speaker_snapshot_is_digest_bound_without_bloating_ledger_policy',
+    'tests.test_agent_workspace_media.MediaTests.test_speaker_linking_uses_saved_words_and_clocks_and_preserves_original',
+    'tests.test_agent_workspace_media.MediaTests.test_changed_original_is_not_linked_or_overwritten',
+    'tests.test_agent_workspace_media.MediaTests.test_missing_speaker_component_does_not_create_task',
     'tests.test_approved_hd_cover.ApprovedHDCoverTests.test_visible_menu_downloads_hd_and_reopen_preserves_cached_result',
     'tests.test_approved_hd_cover.ApprovedHDCoverTests.test_failed_redownload_keeps_old_cover_and_exported_file',
     'tests.test_approved_hd_cover.ApprovedHDCoverTests.test_missing_url_can_refresh_only_the_verified_same_work',

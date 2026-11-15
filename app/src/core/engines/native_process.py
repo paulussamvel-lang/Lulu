@@ -11,6 +11,8 @@ import time
 
 
 class NativeProcessError(RuntimeError):
+    safe_user_message = True
+    code = 'CORE_ASR_NATIVE_FAILED'
     def __init__(self, message, stdout):
         self.stdout = stdout
         super().__init__(message)

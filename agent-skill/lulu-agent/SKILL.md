@@ -25,6 +25,8 @@ Run `capabilities --output json` using the verified CLI before any business comm
 
 - For 文稿/改稿/笔记/会话/技能目录 requests, read [workspace.md](references/workspace.md). Use direct document operations when authorized; call conversations.send only when the user wants Lulu AI to process a request.
 
+- For 文案精选、选题或候选文案列表写入, read the 文案精选 section in [workspace.md](references/workspace.md). Discover `editorial.*` first; ordinary manuscript creation does not add a candidate.
+
 - For direct-safe, confirmation, human handoff, GUI-only, job, partial, cancellation, or recovery flows, read [workflows.md](references/workflows.md).
 - For 下载链接视频、提取音频、保存封面、采集作品数据 requests, read [links.md](references/links.md). Use independent extraction; no transcription model is required. Check EXTRACT-01/02/03/04 availability, which is separate from TR-05.
 - For public URL transcription or subtitles, read the URL transcription section in [workflows.md](references/workflows.md) before calling `prepare`.

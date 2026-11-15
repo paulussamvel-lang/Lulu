@@ -36,9 +36,10 @@ from .control_foundation import PaperTextureFrame, adopt_badge, adopt_button, ad
 
 _DEFAULT_TASK_QUEUE_STORE = object()
 
-from ..edition import display_name
-APP_NAME = display_name()
+from ..branding import workspace_name
+APP_NAME = workspace_name()
 LIVE_RECORDING_PAGE = 9
+CONTENT_WORKBENCH_PAGE = 10
 SIDEBAR_W = 232    # 左活动栏固定宽
 CENTER_MIN_W = 620
 ANIM_MS = 280      # 折叠/展开动画时长
@@ -303,6 +304,9 @@ class MainWindow(QWidget):
         self._font_percent = getattr(self.cfg, "interface_font_percent", 100)
         self.setStyleSheet(T.scale_text_style(T.QSS, self._font_percent))
         self._build()
+        from ..appearance import PALETTES
+        if self.cfg.theme in PALETTES:
+            self._apply_workbench_theme(self.cfg.theme)
         if self._font_percent != 100:
             self._apply_interface_font(self._font_percent)
         self._task_queue_sync_timer = QTimer(self)
@@ -584,6 +588,8 @@ class MainWindow(QWidget):
             pane_accent = shell_theme.accent
             self.rail_left.setProperty("consumerAccentIcon", self._left_open)
             left_color = pane_accent if self._left_open else shell_theme.ink_soft
+            if shell_theme.rail_foreground and self._left_open:
+                left_color = shell_theme.rail_foreground
             self.rail_left.setIcon(QIcon(icons.pixmap(
                 "panel_left", left_color, 18)))
             left_action = "隐藏导航侧栏" if self._left_open else "显示导航侧栏"
@@ -592,6 +598,8 @@ class MainWindow(QWidget):
             self.settings_button.setChecked(settings_active)
             self.settings_button.setProperty("consumerAccentIcon", settings_active)
             settings_color = pane_accent if settings_active else shell_theme.ink_soft
+            if shell_theme.rail_foreground and self._left_open:
+                settings_color = shell_theme.rail_foreground
             self.settings_button.setIcon(QIcon(icons.pixmap("gear", settings_color, 16)))
             self.settings_button.setAccessibleDescription(
                 "当前正在显示设置" if settings_active else "打开中央设置页"
@@ -842,7 +850,7 @@ class MainWindow(QWidget):
         logo.setProperty("brandAsset", "logo_mascot_transparent.png")
         logo.setFixedSize(BRAND_LOGO_SIZE, BRAND_LOGO_SIZE)
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo.setAccessibleName("Lulu 品牌形象")
+        logo.setAccessibleName(f"{APP_NAME} 品牌形象")
         logo.setPixmap(
             icons.image_pixmap(
                 T.asset("logo_mascot_transparent.png"),
@@ -850,8 +858,11 @@ class MainWindow(QWidget):
             )
         )
         self.brand_logo_label = logo
-        brand.addStretch(1)
         brand.addWidget(logo, 0, Qt.AlignmentFlag.AlignCenter)
+        name_label = QLabel(APP_NAME)
+        name_label.setObjectName("workspaceBrandName")
+        name_label.setStyleSheet(f"font-size:15px;font-weight:600;color:{T.INK};")
+        brand.addWidget(name_label)
         brand.addStretch(1)
         lay.addWidget(brand_row)
 
@@ -862,7 +873,8 @@ class MainWindow(QWidget):
         from .workbench_navigation import WorkbenchNavigation
         self.workbench_navigation = WorkbenchNavigation(self.workbench_consumer_theme)
         for ico, text, index in (("headphones", "内容提取", 0), ("workspace_grid", "主页采集", 5),
-                                 ("mic", "文案配音", 4), ("video", "直播录制", LIVE_RECORDING_PAGE)):
+                                 ("mic", "文案配音", 4), ("video", "直播录制", LIVE_RECORDING_PAGE),
+                                 ("file", "文案精选", CONTENT_WORKBENCH_PAGE)):
             self.workbench_navigation.add_row(index, self._page_nav(ico, text, index, live_count=0 if index == 0 else None))
         self.workbench_navigation.layout().addWidget(self._nav_label("素材库"))
         for ico, text, kind in (("workspace_doc", "文稿库", "transcript"),
@@ -1014,7 +1026,7 @@ class MainWindow(QWidget):
             self.open_material_entry(target.entry_id, kind=getattr(target, "library_kind", None))
             return
         index = getattr(target, "page_index", None)
-        if type(index) is int and index in range(LIVE_RECORDING_PAGE + 1):
+        if type(index) is int and index in range(CONTENT_WORKBENCH_PAGE + 1):
             self._switch_page(index)
 
     def _request_update_install(self) -> None:
@@ -1160,9 +1172,9 @@ class MainWindow(QWidget):
             row.setProperty("consumerAccent", active)
             lab.setObjectName("navTextActive" if active else "navText")
             icon_color = (
-                self.workbench_consumer_theme.accent
+                self.workbench_consumer_theme.rail_foreground or self.workbench_consumer_theme.accent
                 if active
-                else self.workbench_consumer_theme.ink_soft
+                else self.workbench_consumer_theme.rail_foreground or self.workbench_consumer_theme.ink_soft
             )
             if iconlab is not None:
                 iconlab.setPixmap(icons.pixmap(ico, icon_color, 17))
@@ -1248,7 +1260,8 @@ class MainWindow(QWidget):
         self.collection_page = None
         self.settings_page = None
         self.live_recording_page = None
-        for _ in range(1, LIVE_RECORDING_PAGE + 1):
+        self.content_page = None
+        for _ in range(1, CONTENT_WORKBENCH_PAGE + 1):
             self.stack.addWidget(self._build_lazy_page_placeholder())
         self._switch_page(self._startup_target_page())
         QTimer.singleShot(350, self, self._prepare_library)
@@ -1296,11 +1309,18 @@ class MainWindow(QWidget):
             5: self.collection_page,
             6: self.settings_page,
             LIVE_RECORDING_PAGE: self.live_recording_page,
+            CONTENT_WORKBENCH_PAGE: self.content_page,
         }.get(index)
         if existing is not None:
             return existing
 
-        if index == 1:
+        if index == CONTENT_WORKBENCH_PAGE:
+            from .content_workbench import ContentWorkbench
+            widget = ContentWorkbench(self)
+            widget.configure_models.connect(self._open_workspace_models)
+            widget.library_changed.connect(self._update_library_counts)
+            self.content_page = widget
+        elif index == 1:
             from .models_page import ModelsPage
             widget = ModelsPage(
                 self.cfg,
@@ -1390,10 +1410,22 @@ class MainWindow(QWidget):
 
     def _scale_workspace_web_text(self, widget) -> None:
         from PySide6.QtWebEngineWidgets import QWebEngineView
+        from .appearance_runtime import bind_web_theme
 
         for view in widget.findChildren(QWebEngineView):
+            bind_web_theme(view, T.ACTIVE.name)
             if not view.property("usesLocalFontScale"):
                 view.setZoomFactor(self._font_percent / 100)
+
+    def _apply_workbench_theme(self, name: str) -> None:
+        from .appearance_runtime import apply_native_theme
+        previous = T.ACTIVE
+        current = T.apply_theme(name)
+        self.workbench_consumer_theme = T.consumer_theme(current.name)
+        apply_native_theme(self, previous, current)
+        self.setStyleSheet(T.scale_text_style(T.QSS, self._font_percent))
+        self._scale_workspace_web_text(self)
+        self._sync_toggle_icons()
 
     def _schedule_interface_font(self, percent: int) -> None:
         self._pending_interface_font = percent
@@ -1412,7 +1444,9 @@ class MainWindow(QWidget):
 
     def _sync_preferences_to_workbench(self, field: str) -> None:
         """设置页保存成功后，把已加载工作台控件同步到同一份 AppConfig。"""
-        if field in {"keep_media", "prefer_subtitles", "link_media_mode", "media_dir", "recording_dir"}:
+        if field == 'theme':
+            self._apply_workbench_theme(self.cfg.theme)
+        elif field in {"keep_media", "prefer_subtitles", "link_media_mode", "media_dir", "recording_dir"}:
             self._publish_extraction_state()
         elif field == "tts_output_dir" and self.voice_page is not None:
             for method_name in (
@@ -4132,6 +4166,16 @@ class MainWindow(QWidget):
         return True
 
     def closeEvent(self, e):  # noqa: N802
+        editorial = getattr(self, 'content_page', None)
+        if editorial is not None:
+            if editorial.is_busy():
+                self._toast('文案评分仍在处理，请先取消评分并等待结束。')
+                e.ignore()
+                return
+            if not editorial.flush():
+                self._toast('文案精选未能保存，请检查页面提示后再退出。')
+                e.ignore()
+                return
         if getattr(self, "_recording_busy", ""):
             self._rec_cancel_requested = True
             e.ignore()

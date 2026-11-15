@@ -205,6 +205,9 @@ def _body(transcript: Transcript) -> list[str]:
             if not (seg.text or "").strip():
                 continue
             txt = speaker_text(seg)
+            if ((transcript.meta or {}).get('diarization_scope') == 'recording'
+                    and seg.speaker_id is None):
+                txt = '发言人待确认：' + txt
             if seg.start is not None:
                 out.append(f"**[{_clock(seg.start)}]** {txt}")
             else:
@@ -269,6 +272,8 @@ def note_body(transcript: Transcript, title: str, summary: str | None = None,
     m = transcript.meta or {}
     parts = [f"# {title}"]
     parts.append("")
+    if m.get('diarization_scope') == 'recording' and m.get('diarization_notice'):
+        parts += ['> ' + str(m['diarization_notice']), '']
     cover_reference = _cover_reference(transcript)
     if cover_reference:
         parts += [f"![封面]({cover_reference})", ""]

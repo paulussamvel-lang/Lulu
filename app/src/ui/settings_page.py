@@ -80,8 +80,6 @@ _PATH_OPTIONS = (
     ("models_dir", "本地模型与运行环境", "转录与四款配音模型。更改时安全迁移已安装资源，需等待当前任务结束。", "storage_ai_models"),
 )
 
-REPOSITORY_URL = "https://github.com/AidenXu-1/Lulu"
-AUTHOR_URL = "https://github.com/AidenXu-1"
 PRODUCT_BOUNDARY = (
     "Lulu坚持本地优先，本地模式下音频与逐字稿只留在本机，不会自动上传内容。\n"
     "链接下载、主页采集、直播、模型下载、检查更新，以及主动选择的云端模型和飞书保存会联网。"
@@ -251,60 +249,6 @@ class StorageRelocateWorker(QThread):
             )
             return
         self.succeeded.emit(self.field, str(resolved))
-
-
-class AuthorContactDialog(QDialog):
-    """二维码只在用户主动点击后显示，不在关于页预览。"""
-
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent)
-        self.setWindowTitle("作者联系方式")
-        self.setWindowModality(Qt.ApplicationModal)
-        self.setModal(True)
-        self.resize(500, 650)
-        self.setMinimumSize(420, 560)
-        self.setStyleSheet(
-            f"QDialog{{background:{T.BG};color:{T.INK};}}"
-            f"QLabel{{background:transparent;color:{T.INK};}}"
-        )
-        root = QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
-        root.setSpacing(10)
-        title = QLabel("兆基｜AI运营")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet(f"font-size:18px;font-weight:600;color:{T.INK};")
-        root.addWidget(title)
-        meta = QLabel("使用微信扫码联系作者")
-        meta.setObjectName("pageMeta")
-        meta.setAlignment(Qt.AlignCenter)
-        root.addWidget(meta)
-        root.addSpacing(6)
-
-        self.qr_pixmap = QPixmap(T.asset("author_contact_wechat.jpg"))
-        self.qr_label = QLabel()
-        self.qr_label.setObjectName("authorContactQr")
-        self.qr_label.setAlignment(Qt.AlignCenter)
-        self.qr_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        if self.qr_pixmap.isNull():
-            self.qr_label.setText("二维码资源暂不可用")
-        else:
-            self.qr_label.setPixmap(
-                self.qr_pixmap.scaled(410, 520, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            )
-        root.addWidget(self.qr_label, 1)
-        close_button = QPushButton("关闭")
-        adopt_button(close_button, role="secondary", size="md", accessible_name="关闭作者联系方式")
-        close_button.clicked.connect(self.accept)
-        root.addWidget(close_button, 0, Qt.AlignHCenter)
-
-    def showEvent(self, event) -> None:  # noqa: N802 - Qt API
-        super().showEvent(event)
-        parent = self.parentWidget()
-        if parent is not None:
-            target = parent.window().frameGeometry().center()
-            frame = self.frameGeometry()
-            frame.moveCenter(target)
-            self.move(frame.topLeft())
 
 
 _SETTINGS_READ_WORKERS: set[QThread] = set()
@@ -504,7 +448,8 @@ class SettingsPage(QWidget):
         brand.addWidget(icons.image_label(T.asset("logo_mascot_transparent.png"), 33))
         brand_copy = QVBoxLayout()
         brand_copy.setSpacing(0)
-        title = QLabel("Lulu")
+        from ..branding import workspace_name
+        title = QLabel(workspace_name())
         title.setStyleSheet(f'font-family:"{T.SERIF}";font-size:24px;font-weight:600;')
         brand_copy.addWidget(title)
         subtitle = QLabel("偏好设置")
@@ -1396,18 +1341,19 @@ class SettingsPage(QWidget):
         pixmap = icons.image_pixmap(T.asset("logo_mascot_transparent.png"), 56)
         if not pixmap.isNull():
             logo.setPixmap(pixmap)
-            logo.setAccessibleName("Lulu 图标")
+            logo.setAccessibleName("Paul工作台 图标")
             hero_lay.addWidget(logo, 0, Qt.AlignVCenter)
         brand_text = QVBoxLayout()
         brand_text.setSpacing(3)
-        product_name = QLabel("Lulu")
+        from ..branding import workspace_name
+        product_name = QLabel(workspace_name())
         product_name.setStyleSheet(
             f'font-family:"{T.SERIF}";font-size:24px;font-weight:600;color:{self._consumer.ink};background:transparent;'
         )
         brand_heading = QHBoxLayout()
         brand_heading.setSpacing(10)
         brand_heading.addWidget(product_name, 0, Qt.AlignBaseline)
-        self.about_tagline = QLabel("一个专为你省钱的内容助手")
+        self.about_tagline = QLabel("下载、转录、文案与配音")
         self.about_tagline.setObjectName("pageMeta")
         self.about_tagline.setWordWrap(True)
         self.about_tagline.setStyleSheet(f'font-size:12px;color:{self._consumer.ink_soft};background:transparent;')
@@ -1428,11 +1374,7 @@ class SettingsPage(QWidget):
             self.update_panel = AboutUpdatePanel(
                 self.cfg,
                 self.update_controller,
-                repository_url=REPOSITORY_URL,
-                author_url=AUTHOR_URL,
                 product_boundary=PRODUCT_BOUNDARY,
-                open_url=self._open_external_url,
-                show_contact=self._show_author_contact,
             )
             self.update_panel.install_requested.connect(self.install_requested.emit)
             self.update_panel.manual_download.connect(self.manual_download.emit)
@@ -1445,21 +1387,6 @@ class SettingsPage(QWidget):
             col.addWidget(fallback)
         col.addStretch(1)
         return page
-
-    def _open_external_url(self, url: str) -> None:
-        if url not in (REPOSITORY_URL, AUTHOR_URL):
-            return
-        try:
-            opened = bool(QDesktopServices.openUrl(QUrl(url)))
-        except Exception:  # noqa: BLE001
-            opened = False
-        if not opened:
-            dialogs.alert(self, "链接暂时无法打开", "系统暂时无法打开这个 GitHub 页面，请稍后重试。")
-
-    def _show_author_contact(self) -> None:
-        dialog = AuthorContactDialog(self)
-        self._author_contact_dialog = dialog
-        dialog.exec()
 
     def _save_value(self, field: str, value) -> bool:
         old_value = getattr(self.cfg, field)

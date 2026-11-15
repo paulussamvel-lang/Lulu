@@ -589,19 +589,15 @@ class AboutUpdatePanel(QFrame):
         controller: UpdateController,
         parent=None,
         *,
-        repository_url: str,
-        author_url: str,
         product_boundary: str,
-        open_url,
-        show_contact,
+        repository_url: str = "",
+        author_url: str = "",
+        open_url=None,
+        show_contact=None,
     ):
         super().__init__(parent)
         self.cfg = cfg
         self.controller = controller
-        self.repository_url = repository_url
-        self.author_url = author_url
-        self._open_url = open_url
-        self._show_contact = show_contact
         self._consumer = T.consumer_theme(getattr(cfg, "theme", None))
         self.setObjectName("aboutUpdatePanel")
         self._build(product_boundary)
@@ -722,27 +718,11 @@ class AboutUpdatePanel(QFrame):
 
         self.info_group = QFrame()
         self.info_group.setObjectName("aboutInfoGroup")
-        self.info_group.setAccessibleName("产品与作者")
+        self.info_group.setAccessibleName("工作台信息")
         info = QVBoxLayout(self.info_group)
         info.setContentsMargins(0, 0, 0, 0)
         info.setSpacing(0)
-        repo_row = self._row("GitHub 仓库", self.repository_url)
-        self.repository_button = self._row_button("打开仓库", "打开 Lulu GitHub 仓库")
-        self.repository_button.clicked.connect(lambda: self._open_url(self.repository_url))
-        repo_row.layout().addWidget(self.repository_button, 0, Qt.AlignVCenter)
-        info.addWidget(repo_row)
-        info.addWidget(self._divider())
-        author_row = self._row("作者 GitHub 主页", self.author_url)
-        self.author_button = self._row_button("打开主页", "打开作者 GitHub 主页")
-        self.author_button.clicked.connect(lambda: self._open_url(self.author_url))
-        author_row.layout().addWidget(self.author_button, 0, Qt.AlignVCenter)
-        info.addWidget(author_row)
-        info.addWidget(self._divider())
-        contact_row = self._row("作者联系方式", "微信扫码联系兆基")
-        self.contact_button = self._row_button("查看微信二维码", "查看作者微信二维码")
-        self.contact_button.clicked.connect(self._show_contact)
-        contact_row.layout().addWidget(self.contact_button, 0, Qt.AlignVCenter)
-        info.addWidget(contact_row)
+        info.addWidget(self._row("工作台", "Paul工作台 · 本地定制版"))
         root.addWidget(self.info_group)
 
         self.boundary_group = QFrame()

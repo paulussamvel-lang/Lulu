@@ -270,7 +270,7 @@ class LiveController(QObject):
         item = (operation, arguments, callback, failure)
         if first:
             self.queue.appendleft(item)
-        elif operation in {'start', 'pause', 'pause_all', 'comments_setting'}:
+        elif operation in {'start', 'pause', 'pause_all', 'comments_setting', 'quality_setting'}:
             # User actions keep their order and precede queued background polls.
             at = next((i for i, queued in enumerate(self.queue) if queued[0] == 'snapshot'), len(self.queue))
             self.queue.insert(at, item)

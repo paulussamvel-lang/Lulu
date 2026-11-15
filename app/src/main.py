@@ -44,8 +44,9 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     from .edition import display_name
+    from .branding import workspace_name
     app.setApplicationName(display_name())
-    app.setApplicationDisplayName(display_name())
+    app.setApplicationDisplayName(workspace_name())
     theme.apply_fonts(app)
     # 在创建控件前应用唯一的 Lulu 宣纸样式。
     _apply_startup_theme()
@@ -201,7 +202,7 @@ def _show_update_recovery_error() -> int:
     activate_regular_app()
     dialog = QMessageBox(QMessageBox.Icon.Warning, 'Lulu 更新需要恢复',
         '上次更新尚未恢复完成，原有文稿、模型、现有程序和恢复记录均已保留。\n'
-        '请保留现场并联系作者处理恢复记录。可查看最新版安装包；仅覆盖安装可能仍需处理这份记录。')
+        '请保留现场并查看诊断记录，处理安装恢复问题。可查看最新版安装包；仅覆盖安装可能仍需处理这份记录。')
     download = dialog.addButton('查看最新版安装包', QMessageBox.ButtonRole.ActionRole)
     dialog.addButton('关闭', QMessageBox.ButtonRole.RejectRole)
     dialog.exec()

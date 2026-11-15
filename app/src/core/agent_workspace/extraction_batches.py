@@ -765,11 +765,17 @@ class ExtractionBatchMixin:
                             'failed' if incomplete else 'succeeded', progress=100 if not incomplete else item['progress'],
                             message='本次所选内容已保存' if not incomplete else '已保留成功内容，请只处理未完成项',
                             error='；'.join((result.meta or {}).get('extraction_errors', [])) or None)
+                if not incomplete and (result.meta or {}).get('timestamp_warning'):
+                    item['message'] = result.meta['timestamp_warning']
                 item.pop('recover_only', None)
                 item['activity']['finished_at'] = time.time()
                 item['applied_attempt_id'] = item['attempt_id']
                 self._save(batch, item)
         except Exception as exc:
+            from ..diagnostics import record_failure, failure_code
+            from ..engines.local_native import IncompleteTranscription
+            from ..engines.native_process import NativeProcessError
+            record_failure('extraction', exc)
             with self.lock:
                 item['activity']['finished_at'] = time.time()
                 for key in requested:
@@ -781,7 +787,9 @@ class ExtractionBatchMixin:
                 item.update(state='recovery_required' if path.exists() or any(a['state']=='unknown' for a in item['assets'].values())
                             else 'cancelled' if cancel.is_set() else 'failed',
                             message='本项未完成，已有结果保留；请核对后显式继续',
-                            error=str(exc)[:1000] if isinstance(exc, (ValueError, InterruptedError)) else '提取未完成')
+                            error=str(exc)[:1000] if isinstance(exc, (ValueError, InterruptedError,
+                                IncompleteTranscription, NativeProcessError)) else '提取未完成，请查看本机诊断记录',
+                            failure_code=failure_code(exc))
                 self._save(batch, item)
         finally:
             self._extraction_cancel_events.pop((bid, item['index']), None)

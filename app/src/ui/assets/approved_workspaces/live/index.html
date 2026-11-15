@@ -24,6 +24,13 @@
             <div><span>可用空间</span><strong id="disk-space">—</strong></div>
           </div>
           <div class="panel-options" aria-label="录制设置">
+            <label class="capture-setting" title="从下一场录制起生效；选择平台提供的画质档位，缺少时使用最近可用档位，不重新编码。">
+              <span class="capture-label">目标画质</span>
+              <select id="recording-quality" aria-label="直播录制目标画质">
+                <option value="origin">原画（最高）</option><option value="1080p">超清 · 1080P 档</option>
+                <option value="720p">高清 · 720P 档</option><option value="540p">标清 · 540P 档</option>
+              </select>
+            </label>
             <div class="capture-setting">
               <span id="comments-label" class="capture-label">保存弹幕</span>
               <button id="comments-toggle" type="button" role="switch" aria-checked="false" aria-labelledby="comments-label"><span class="switch-track" aria-hidden="true"><span></span></span></button>

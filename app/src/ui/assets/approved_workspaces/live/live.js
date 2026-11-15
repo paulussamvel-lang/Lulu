@@ -224,6 +224,9 @@
     renderComments();
   }
   function renderComments() {
+    const quality = $('recording-quality');
+    if (document.activeElement !== quality) quality.value = snapshot.quality || 'origin';
+    quality.disabled = !api;
     const button = $('comments-toggle');
     button.setAttribute('aria-checked', String(commentsPending ? !snapshot.comments : Boolean(snapshot.comments)));
     button.setAttribute('aria-busy', String(commentsPending));
@@ -565,6 +568,12 @@
   $('prev-page').onclick = () => setPage(page - 1);
   $('next-page').onclick = () => setPage(page + 1);
   $('comments-toggle').onclick = changeComments;
+  $('recording-quality').onchange = async () => {
+    const field = $('recording-quality');
+    field.disabled = true;
+    try { await perform('quality_setting', {quality: field.value}); }
+    finally { field.disabled = false; }
+  };
   $('storage-button').onclick = openStorage;
   $('add-host').onclick = showAdd; $('empty-add').onclick = showAdd;
   $('pause-all').onclick = confirmPauseAll;

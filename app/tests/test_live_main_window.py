@@ -72,7 +72,10 @@ class LiveMainWindowTests(unittest.TestCase):
         self.assertTrue(main.center_wrap.property('paperTextureActive'))
         self.assertTrue(main.titlebar_paper_center.property('paperTextureActive'))
         self.assertIs(main._ensure_page_loaded(8),main.stack.widget(0))
-        self.assertEqual(main.stack.count(),10)
+        from src.ui.main_window import CONTENT_WORKBENCH_PAGE
+        self.assertEqual(main.stack.count(), CONTENT_WORKBENCH_PAGE + 1)
+        self.assertTrue(any(index == CONTENT_WORKBENCH_PAGE and label.text() == '文案精选'
+                            for index, _, _, _, label, _ in main._page_navs))
         # Actual native window render. Fixtures contain no real user data or credentials.
         proof = os.environ.get('LULU_LIVE_PROOF_PATH')
         if proof:

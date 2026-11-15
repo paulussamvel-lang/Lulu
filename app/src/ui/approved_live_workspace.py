@@ -69,6 +69,7 @@ class ApprovedLiveWorkspace(LiveRecordingPage):
                 'pause': self._request_pause, 'remove': self._request_remove,
                 'pause_all': self._request_pause_all, 'delete': self._request_delete,
                 'comments_setting': self._request_comments_setting,
+                'quality_setting': self._request_quality_setting,
                 'open_room': self._request_room, 'login': self._request_login, 'clear_login': self._request_clear_login,
                 'directory': self._request_directory, 'open_folder': self._request_open_folder,
                 'detail': self._request_detail, 'data': self._request_data, 'comments': self._request_comments,
@@ -122,7 +123,7 @@ class ApprovedLiveWorkspace(LiveRecordingPage):
             monitoring=data['monitoring'], recording=data['recording'],
             free=data['free_bytes'] / (1024 ** 3) if data['free_bytes'] is not None else None,
             diskWarning=bool(data['disk_warning']), folder=data['directory'],
-            comments=bool(data['comments_enabled']), connected=saved, loginLabel=label,
+            comments=bool(data['comments_enabled']), quality=data.get('quality', 'origin'), connected=saved, loginLabel=label,
             rows=[formatter(row) for row in data['rows']],
             page=data['page'], pages=data['pages'], total=data['total'],
         ))
@@ -134,6 +135,11 @@ class ApprovedLiveWorkspace(LiveRecordingPage):
         self._view_params = dict(tab=tab, query=query, filter=filter, page=page)
         self.refresh()
         done()
+
+    def _request_quality_setting(self, done, *, quality):
+        if quality not in {'origin', '1080p', '720p', '540p'}:
+            raise ValueError('画质档位无效')
+        self._call(done, 'quality_setting', quality=quality)
 
     def _message(self, text):
         if hasattr(self, 'approved') and text:
