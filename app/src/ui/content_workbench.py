@@ -8,11 +8,12 @@ from PySide6.QtWidgets import (
     QApplication, QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton, QSplitter,
-    QVBoxLayout, QWidget,
+    QTabWidget, QVBoxLayout, QWidget,
 )
 
 from ..core import content_workbench as core
 from . import theme as T
+from .candidate_comparison import CandidateComparison
 from .control_foundation import adopt_button, adopt_list_widget, adopt_select_field, adopt_text_area, adopt_text_field, build_consumer_page_header
 
 
@@ -66,6 +67,9 @@ class ContentWorkbench(QWidget):
         top.addWidget(self._button('新建选题', self._new_project))
         top.addWidget(self._button('修改选题名', self._rename_project))
         top.addWidget(self._button('导入拾句', self._import_shiju))
+        self.assembly_button = self._button('展开精选与组稿', self._toggle_assembly)
+        self.assembly_button.setCheckable(True)
+        top.addWidget(self.assembly_button)
         root_layout.addLayout(top)
         self.audience = QLineEdit()
         self.audience.setPlaceholderText('目标观众，例如：第一次接触 AI 工具的创作者')
@@ -78,7 +82,8 @@ class ContentWorkbench(QWidget):
         self.splitter = split
         root_layout.addWidget(split, 1)
 
-        left, layout = self._column('候选文案', '勾选本次对比的 1–8 篇')
+        left, layout = self._column('候选文案', '勾选后自动并排显示；评分最多 8 篇')
+        left.setMinimumWidth(180)
         split.addWidget(left)
         self.candidates = QListWidget()
         self.candidates.setAccessibleName('候选文案列表')
@@ -90,8 +95,15 @@ class ContentWorkbench(QWidget):
         layout.addWidget(self._button('导入 TXT / Markdown', self._import_files))
         layout.addWidget(self._button('粘贴为新文案', self._paste))
 
+        self.content_tabs = QTabWidget()
+        self.content_tabs.setAccessibleName('文案查看方式')
+        split.addWidget(self.content_tabs)
+        self.comparison = CandidateComparison()
+        self.comparison.edit_requested.connect(self._edit_comparison_candidate)
+        self.comparison.clip_requested.connect(self._add_comparison_clip)
+        self.content_tabs.addTab(self.comparison, '并排对比')
         center, layout = self._column('原文与评分', '编辑的是候选副本，原文稿保留')
-        split.addWidget(center)
+        self.content_tabs.addTab(center, '单篇编辑与评分')
         self.title = QLineEdit()
         self.title.setPlaceholderText('候选文案标题')
         self.title.setAccessibleName('候选文案标题')
@@ -117,7 +129,10 @@ class ContentWorkbench(QWidget):
         layout.addWidget(self.review_view, 2)
 
         right, layout = self._column('精选与组稿', '拖动片段排序，组稿后可继续编辑')
+        self.assembly_panel = right
+        right.setMinimumWidth(300)
         split.addWidget(right)
+        right.hide()
         self.clips = QListWidget()
         self.clips.setAccessibleName('精选片段，支持拖动排序')
         adopt_list_widget(self.clips, accessible_name='精选片段，支持拖动排序')
@@ -141,7 +156,8 @@ class ContentWorkbench(QWidget):
         buttons.addWidget(self._button('上次组稿', self._restore_draft))
         layout.addLayout(buttons)
         layout.addWidget(self._button('另存到文稿库', self._save_to_library))
-        split.setSizes([205, 490, 380])
+        split.setSizes([190, 900, 0])
+        split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 3)
         split.setStretchFactor(2, 2)
 
@@ -325,6 +341,7 @@ class ContentWorkbench(QWidget):
         self.candidates.setCurrentRow(selected)
         self.candidates.blockSignals(False)
         self._switch_candidate(selected)
+        self._refresh_comparison()
 
     def _switch_candidate(self, index):
         self.loading = True
@@ -343,17 +360,51 @@ class ContentWorkbench(QWidget):
         if item: item.setText(self.candidate['title'] or '候选文案')
         self._changed()
         self._render_review()
+        self._refresh_comparison()
 
     def _selection_changed(self, item):
         candidate = next(c for c in self.project['candidates'] if c['id'] == item.data(Qt.UserRole))
         candidate['selected'] = item.checkState() == Qt.Checked
         self._changed()
         self._render_review()
+        self._refresh_comparison()
+
+    def _refresh_comparison(self):
+        self.comparison.set_project(self.project)
+
+    def _toggle_assembly(self, checked):
+        self.assembly_panel.setVisible(checked)
+        self.assembly_button.setText('收起精选与组稿' if checked else '展开精选与组稿')
+        if checked:
+            self.splitter.setSizes([190, max(340, self.width() - 560), 320])
+        else:
+            self.splitter.setSizes([190, max(340, self.width() - 250), 0])
+
+    def _edit_comparison_candidate(self, candidate_id):
+        index = next((i for i, candidate in enumerate(self.project['candidates'])
+                      if candidate['id'] == candidate_id), -1)
+        if index >= 0:
+            self.candidates.setCurrentRow(index)
+            self.content_tabs.setCurrentIndex(1)
+            self.original.setFocus()
+
+    def _add_comparison_clip(self, candidate_id, text):
+        try:
+            core.add_clip(self.project, candidate_id, text)
+            self._refresh_clips()
+            self._changed()
+            self.assembly_button.setChecked(True)
+            self._toggle_assembly(True)
+            self._error('已加入精选，片段来源保留。')
+        except ValueError as exc:
+            self._error(str(exc))
 
     def _audience_changed(self, text):
         if self.loading: return
         self.project['audience'] = text
         self._changed()
+        self._render_review()
+        self._refresh_comparison()
 
     def _append(self, title, text, **source):
         try:
@@ -443,6 +494,7 @@ class ContentWorkbench(QWidget):
         index = next((i for i,c in enumerate(self.project['candidates']) if c['id'] == clip['candidate_id']), -1)
         if index >= 0:
             self.candidates.setCurrentRow(index)
+            self.content_tabs.setCurrentIndex(1)
             self.original.moveCursor(QTextCursor.Start)
             self.original.find(clip['text'])
             if core.digest(self.candidate['text']) != clip['source_hash']:
@@ -549,6 +601,7 @@ class ContentWorkbench(QWidget):
             project['review'] = result
             if not self.flush(): return
             self._render_review()
+            self._refresh_comparison()
             self._error('评分已保存；原文未修改。')
         except ValueError as exc: self._error(str(exc))
 

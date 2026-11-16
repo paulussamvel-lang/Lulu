@@ -445,7 +445,7 @@ class SettingsPage(QWidget):
         lay.setSpacing(5)
         brand = QHBoxLayout()
         brand.setSpacing(8)
-        brand.addWidget(icons.image_label(T.asset("logo_mascot_transparent.png"), 33))
+        brand.addWidget(icons.image_label(T.asset("paul-creative-hub.png"), 33))
         brand_copy = QVBoxLayout()
         brand_copy.setSpacing(0)
         from ..branding import workspace_name
@@ -1337,8 +1337,8 @@ class SettingsPage(QWidget):
         hero_lay.setSpacing(16)
         logo = QLabel()
         logo.setFixedSize(56, 56)
-        logo.setProperty("brandAsset", "logo_mascot_transparent.png")
-        pixmap = icons.image_pixmap(T.asset("logo_mascot_transparent.png"), 56)
+        logo.setProperty("brandAsset", "paul-creative-hub.png")
+        pixmap = icons.image_pixmap(T.asset("paul-creative-hub.png"), 56)
         if not pixmap.isNull():
             logo.setPixmap(pixmap)
             logo.setAccessibleName("Paul工作台 图标")

@@ -821,7 +821,7 @@ class MainWindow(QWidget):
         brand.setSpacing(8 if compact else 11)
         logo_size = 52 if compact else BRAND_LOGO_SIZE
         self.brand_logo_label.setFixedSize(logo_size, logo_size)
-        self.brand_logo_label.setPixmap(icons.image_pixmap(T.asset("logo_mascot_transparent.png"), logo_size))
+        self.brand_logo_label.setPixmap(icons.image_pixmap(T.asset("paul-creative-hub.png"), logo_size))
 
     def _build_sidebar(self) -> QWidget:
         bar = PaperTextureFrame(strength=0.0, layer="rail")
@@ -847,13 +847,13 @@ class MainWindow(QWidget):
         logo = QLabel()
         logo.setObjectName("brandLogo")
         adopt_consumer_theme_scope(logo, "globalShell")
-        logo.setProperty("brandAsset", "logo_mascot_transparent.png")
+        logo.setProperty("brandAsset", "paul-creative-hub.png")
         logo.setFixedSize(BRAND_LOGO_SIZE, BRAND_LOGO_SIZE)
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo.setAccessibleName(f"{APP_NAME} 品牌形象")
         logo.setPixmap(
             icons.image_pixmap(
-                T.asset("logo_mascot_transparent.png"),
+                T.asset("paul-creative-hub.png"),
                 BRAND_LOGO_SIZE,
             )
         )

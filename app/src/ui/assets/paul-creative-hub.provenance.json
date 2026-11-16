@@ -1,0 +1,7 @@
+{
+  "tool": "imagegen",
+  "purpose": "Paul工作台已选定的创作中枢应用图标",
+  "prompt": "Extract only the selected 创作中枢 icon. Preserve the deep forest-green rounded square and four warm-ivory interlocking rounded pieces. Remove captions, miniature duplicate and comparison-sheet background. Restore high-resolution details without redesign; use a transparent outer background.",
+  "background": "transparent",
+  "source": "User-approved concept 01 创作中枢"
+}
