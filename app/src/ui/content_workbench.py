@@ -64,11 +64,17 @@ class ContentWorkbench(QWidget):
         adopt_select_field(self.projects, accessible_name='选题')
         self.projects.currentIndexChanged.connect(self._switch_project)
         top.addWidget(self.projects, 1)
+        top.addWidget(self._button('从文稿库选入', self._import_library))
+        self.candidate_button = self._button('管理候选', self._toggle_candidates)
+        self.candidate_button.setCheckable(True)
+        top.addWidget(self.candidate_button)
         top.addWidget(self._button('新建选题', self._new_project))
         top.addWidget(self._button('修改选题名', self._rename_project))
         top.addWidget(self._button('导入拾句', self._import_shiju))
         self.assembly_button = self._button('展开精选与组稿', self._toggle_assembly)
         self.assembly_button.setCheckable(True)
+        self.assembly_button.setChecked(True)
+        self.assembly_button.setText('收起新文案')
         top.addWidget(self.assembly_button)
         root_layout.addLayout(top)
         self.audience = QLineEdit()
@@ -83,8 +89,10 @@ class ContentWorkbench(QWidget):
         root_layout.addWidget(split, 1)
 
         left, layout = self._column('候选文案', '勾选后自动并排显示；评分最多 8 篇')
+        self.candidate_panel = left
         left.setMinimumWidth(180)
         split.addWidget(left)
+        left.hide()
         self.candidates = QListWidget()
         self.candidates.setAccessibleName('候选文案列表')
         adopt_list_widget(self.candidates, accessible_name='候选文案列表')
@@ -101,6 +109,8 @@ class ContentWorkbench(QWidget):
         self.comparison = CandidateComparison()
         self.comparison.edit_requested.connect(self._edit_comparison_candidate)
         self.comparison.clip_requested.connect(self._add_comparison_clip)
+        self.comparison.sentence_requested.connect(self._pick_sentence)
+        self.comparison.import_requested.connect(self._import_library)
         self.content_tabs.addTab(self.comparison, '并排对比')
         center, layout = self._column('原文与评分', '编辑的是候选副本，原文稿保留')
         self.content_tabs.addTab(center, '单篇编辑与评分')
@@ -128,38 +138,49 @@ class ContentWorkbench(QWidget):
         adopt_text_area(self.review_view)
         layout.addWidget(self.review_view, 2)
 
-        right, layout = self._column('精选与组稿', '拖动片段排序，组稿后可继续编辑')
+        right, layout = self._column('新文案', '左侧点句即加入；这里可以直接修改、补写')
         self.assembly_panel = right
-        right.setMinimumWidth(300)
+        right.setMinimumWidth(320)
         split.addWidget(right)
-        right.hide()
+        self.draft = QPlainTextEdit()
+        self.draft.setPlaceholderText('点击左侧任意一句，会按点击顺序加入这里。\n\n也可以直接输入自己的内容，选句会继续追加到末尾。')
+        self.draft.setAccessibleName('精选组稿正文')
+        adopt_text_area(self.draft)
+        self.draft.textChanged.connect(self._draft_changed)
+        layout.addWidget(self.draft, 4)
+        self.clip_details_button = self._button('句子来源与排序（0）', self._toggle_clip_details)
+        self.clip_details_button.setCheckable(True)
+        layout.addWidget(self.clip_details_button)
+        self.clip_details = QWidget()
+        details_layout = QVBoxLayout(self.clip_details)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.clip_details, 2)
+        self.clip_details.hide()
         self.clips = QListWidget()
         self.clips.setAccessibleName('精选片段，支持拖动排序')
         adopt_list_widget(self.clips, accessible_name='精选片段，支持拖动排序')
         self.clips.setDragDropMode(QAbstractItemView.InternalMove)
         self.clips.model().rowsMoved.connect(self._reorder_clips)
         self.clips.itemDoubleClicked.connect(self._locate_clip)
-        layout.addWidget(self.clips, 2)
+        details_layout.addWidget(self.clips, 1)
         buttons = QHBoxLayout()
         buttons.addWidget(self._button('移除片段', self._remove_clip))
-        buttons.addWidget(self._button('按顺序组稿', self._assemble))
-        layout.addLayout(buttons)
-        self.draft = QPlainTextEdit()
-        self.draft.setPlaceholderText('选入片段后点击“按顺序组稿”，也可以直接写稿。')
-        self.draft.setAccessibleName('精选组稿正文')
-        adopt_text_area(self.draft)
-        self.draft.textChanged.connect(self._draft_changed)
-        layout.addWidget(self.draft, 3)
+        buttons.addWidget(self._button('用片段重新组稿', self._assemble))
+        details_layout.addLayout(buttons)
+        hint = QLabel('重新组稿会替换右侧正文，当前稿会保留到“上次组稿”。')
+        hint.setWordWrap(True)
+        hint.setObjectName('muted')
+        details_layout.addWidget(hint)
         buttons = QHBoxLayout()
         buttons.addWidget(self._button('复制', lambda: QApplication.clipboard().setText(self.draft.toPlainText())))
         buttons.addWidget(self._button('导出', self._export))
         buttons.addWidget(self._button('上次组稿', self._restore_draft))
         layout.addLayout(buttons)
         layout.addWidget(self._button('另存到文稿库', self._save_to_library))
-        split.setSizes([190, 900, 0])
+        split.setSizes([0, 840, 350])
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 3)
-        split.setStretchFactor(2, 2)
+        split.setStretchFactor(2, 1)
 
         model_row = QHBoxLayout()
         self.family = QComboBox()
@@ -294,6 +315,30 @@ class ContentWorkbench(QWidget):
         self._refresh_clips()
         self.refresh_connections()
 
+    def open_creator_topic(self, topic):
+        """Create one linked editorial project, retaining source notes as copies."""
+        from ..core.creator_workbench import topic_markdown
+        if not self.flush():
+            return ''
+        state = self.store.load()
+        project = next((p for p in state['projects'] if p.get('creator_topic_id') == topic['id']
+                        or p['id'] == topic.get('editorial_project_id')), None)
+        if project is None:
+            project = core.new_project(topic['title'])
+            project.update(creator_topic_id=topic['id'], audience=topic['brief'].get('目标观众', ''))
+            state['projects'].append(project)
+        # A changed analysis is a new reference snapshot; prior candidates stay intact.
+        text = topic_markdown(topic)
+        fingerprint = core.digest(text)
+        if not any(c.get('creator_snapshot') == fingerprint for c in project['candidates']):
+            candidate = core.add_candidate(project, '选题与拆解参考 · ' + topic['title'], text,
+                                           source='选题库 / 视频拆解副本')
+            candidate['creator_snapshot'] = fingerprint
+        self.store.save(state)
+        self._adopt_state(state)
+        self.projects.setCurrentIndex(self.projects.findData(project['id']))
+        return project['id']
+
     def _new_project(self):
         title, ok = QInputDialog.getText(self, '新建选题', '选题名称')
         if ok and title.strip():
@@ -374,11 +419,45 @@ class ContentWorkbench(QWidget):
 
     def _toggle_assembly(self, checked):
         self.assembly_panel.setVisible(checked)
-        self.assembly_button.setText('收起精选与组稿' if checked else '展开精选与组稿')
-        if checked:
-            self.splitter.setSizes([190, max(340, self.width() - 560), 320])
-        else:
-            self.splitter.setSizes([190, max(340, self.width() - 250), 0])
+        self.assembly_button.setText('收起新文案' if checked else '展开新文案')
+        self._size_columns()
+
+    def _toggle_candidates(self, checked):
+        self.candidate_panel.setVisible(checked)
+        self.candidate_button.setText('收起候选' if checked else '管理候选')
+        self._size_columns()
+
+    def _size_columns(self):
+        left = 190 if self.candidate_button.isChecked() else 0
+        right = 350 if self.assembly_button.isChecked() else 0
+        self.splitter.setSizes([left, max(300, self.width() - left - right - 70), right])
+
+    def _toggle_clip_details(self, checked):
+        self.clip_details.setVisible(checked)
+
+    def _append_selected_clip(self, clip):
+        insertion = core.append_clip_to_draft(self.project, clip)
+        # One undo step; preserve edits, the user's current caret and selection.
+        position = self.draft.textCursor()
+        cursor = QTextCursor(self.draft.document())
+        cursor.movePosition(QTextCursor.End)
+        cursor.beginEditBlock()
+        cursor.insertText(insertion)
+        cursor.endEditBlock()
+        self.draft.setTextCursor(position)
+        self._refresh_clips()
+        self._refresh_comparison()
+        self._changed()
+        if not self.assembly_button.isChecked():
+            self.assembly_button.setChecked(True)
+            self._toggle_assembly(True)
+        self._error('已加入右侧新文案，可直接修改或继续输入。')
+
+    def _pick_sentence(self, candidate_id, start, end):
+        try:
+            self._append_selected_clip(core.pick_sentence(self.project, candidate_id, start, end))
+        except (ValueError, StopIteration) as exc:
+            self._error(str(exc) or '原文已变化，请重新点选。')
 
     def _edit_comparison_candidate(self, candidate_id):
         index = next((i for i, candidate in enumerate(self.project['candidates'])
@@ -390,12 +469,7 @@ class ContentWorkbench(QWidget):
 
     def _add_comparison_clip(self, candidate_id, text):
         try:
-            core.add_clip(self.project, candidate_id, text)
-            self._refresh_clips()
-            self._changed()
-            self.assembly_button.setChecked(True)
-            self._toggle_assembly(True)
-            self._error('已加入精选，片段来源保留。')
+            self._append_selected_clip(core.add_clip(self.project, candidate_id, text))
         except ValueError as exc:
             self._error(str(exc))
 
@@ -462,9 +536,7 @@ class ContentWorkbench(QWidget):
     def _add_clip(self):
         if not self.candidate: return
         try:
-            core.add_clip(self.project, self.candidate['id'], self.original.textCursor().selectedText())
-            self._refresh_clips()
-            self._changed()
+            self._append_selected_clip(core.add_clip(self.project, self.candidate['id'], self.original.textCursor().selectedText()))
         except ValueError as exc: self._error(str(exc))
 
     def _refresh_clips(self):
@@ -476,6 +548,7 @@ class ContentWorkbench(QWidget):
             item.setToolTip(clip['text'] + '\n\n来源：' + clip['title'])
             self.clips.addItem(item)
         self.clips.blockSignals(False)
+        self.clip_details_button.setText(f'句子来源与排序（{len(self.project["clips"])}）')
 
     def _reorder_clips(self, *_):
         by_id = {c['id']:c for c in self.project['clips']}

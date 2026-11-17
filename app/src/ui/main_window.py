@@ -40,6 +40,7 @@ from ..branding import workspace_name
 APP_NAME = workspace_name()
 LIVE_RECORDING_PAGE = 9
 CONTENT_WORKBENCH_PAGE = 10
+CREATOR_WORKBENCH_PAGE = 11
 SIDEBAR_W = 232    # 左活动栏固定宽
 CENTER_MIN_W = 620
 ANIM_MS = 280      # 折叠/展开动画时长
@@ -303,6 +304,7 @@ class MainWindow(QWidget):
         self.setAcceptDrops(True)
         self._font_percent = getattr(self.cfg, "interface_font_percent", 100)
         self.setStyleSheet(T.scale_text_style(T.QSS, self._font_percent))
+        self._navigation_style = self.style()
         self._build()
         from ..appearance import PALETTES
         if self.cfg.theme in PALETTES:
@@ -872,9 +874,10 @@ class MainWindow(QWidget):
         lay.addWidget(self._nav_label("工作台"))
         from .workbench_navigation import WorkbenchNavigation
         self.workbench_navigation = WorkbenchNavigation(self.workbench_consumer_theme)
-        for ico, text, index in (("headphones", "内容提取", 0), ("workspace_grid", "主页采集", 5),
-                                 ("mic", "文案配音", 4), ("video", "直播录制", LIVE_RECORDING_PAGE),
-                                 ("file", "文案精选", CONTENT_WORKBENCH_PAGE)):
+        for ico, text, index in (("workspace_grid", "选题与拆解", CREATOR_WORKBENCH_PAGE),
+                                 ("file", "文案精选", CONTENT_WORKBENCH_PAGE),
+                                 ("headphones", "内容提取", 0), ("workspace_grid", "主页采集", 5),
+                                 ("mic", "文案配音", 4), ("video", "直播录制", LIVE_RECORDING_PAGE)):
             self.workbench_navigation.add_row(index, self._page_nav(ico, text, index, live_count=0 if index == 0 else None))
         self.workbench_navigation.layout().addWidget(self._nav_label("素材库"))
         for ico, text, kind in (("workspace_doc", "文稿库", "transcript"),
@@ -1026,7 +1029,7 @@ class MainWindow(QWidget):
             self.open_material_entry(target.entry_id, kind=getattr(target, "library_kind", None))
             return
         index = getattr(target, "page_index", None)
-        if type(index) is int and index in range(CONTENT_WORKBENCH_PAGE + 1):
+        if type(index) is int and index in range(CREATOR_WORKBENCH_PAGE + 1):
             self._switch_page(index)
 
     def _request_update_install(self) -> None:
@@ -1135,6 +1138,9 @@ class MainWindow(QWidget):
             index = 0
         if self._storage_relocation_in_progress and index != 6:
             return
+        creator = getattr(self, 'creator_page', None)
+        if creator is not None and not creator.flush():
+            return
         # Selection responds before a first-use page constructs its controls.
         self._sync_page_navigation(target_index=index, target_kind=library_kind)
         self._ensure_page_loaded(index)
@@ -1151,6 +1157,8 @@ class MainWindow(QWidget):
                 self.library_page._set_kind(library_kind)
             else:
                 self.library_page.refresh()
+        elif index == CREATOR_WORKBENCH_PAGE:
+            self.creator_page.refresh_list()
         elif index == 4:
             QTimer.singleShot(0, self, lambda: self.voice_page.refresh() if self.stack.currentIndex() == 4 else None)
         elif index == 5:
@@ -1180,9 +1188,12 @@ class MainWindow(QWidget):
                 iconlab.setPixmap(icons.pixmap(ico, icon_color, 17))
             if idx == 2 and kind in self._library_count_labels:
                 self._library_count_labels[kind].setStyleSheet(f"font-size: 11px; color: {icon_color};")
+            # Retain the window's stylesheet proxy for its full lifetime. Child
+            # style wrappers may be recycled when an earlier window is retired.
+            style = self._navigation_style
             for w in (row, lab):
-                w.style().unpolish(w)
-                w.style().polish(w)
+                style.unpolish(w)
+                style.polish(w)
         self.workbench_navigation.select(('library', current_kind) if index == 2 else index)
         self._sync_toggle_icons()
 
@@ -1261,11 +1272,32 @@ class MainWindow(QWidget):
         self.settings_page = None
         self.live_recording_page = None
         self.content_page = None
-        for _ in range(1, CONTENT_WORKBENCH_PAGE + 1):
+        self.creator_page = None
+        for _ in range(1, CREATOR_WORKBENCH_PAGE + 1):
             self.stack.addWidget(self._build_lazy_page_placeholder())
         self._switch_page(self._startup_target_page())
         QTimer.singleShot(350, self, self._prepare_library)
         return self.stack
+
+    def _open_creator_editorial(self, topic_id):
+        page = self.creator_page
+        if page is None or page.topic is None or page.topic['id'] != topic_id or not page.flush():
+            return
+        self._ensure_page_loaded(CONTENT_WORKBENCH_PAGE)
+        try:
+            project_id = self.content_page.open_creator_topic(page.topic)
+            if project_id:
+                page.topic['editorial_project_id'] = project_id
+                if page.flush():
+                    self._switch_page(CONTENT_WORKBENCH_PAGE)
+        except (OSError, ValueError, RuntimeError) as exc:
+            page.error(str(exc))
+
+    def _open_creator_extraction(self, source):
+        self._switch_page(0)
+        if source:
+            self.extraction_workspace.stage_link(source)
+            self._toast('已填入参考链接。请选择下载或转录，不会自动开始任务。')
 
     def _prepare_voice_page(self) -> None:
         # Build controls after the shell has painted; never load an inference
@@ -1310,11 +1342,19 @@ class MainWindow(QWidget):
             6: self.settings_page,
             LIVE_RECORDING_PAGE: self.live_recording_page,
             CONTENT_WORKBENCH_PAGE: self.content_page,
+            CREATOR_WORKBENCH_PAGE: self.creator_page,
         }.get(index)
         if existing is not None:
             return existing
 
-        if index == CONTENT_WORKBENCH_PAGE:
+        if index == CREATOR_WORKBENCH_PAGE:
+            from .creator_workbench import CreatorWorkbench
+            widget = CreatorWorkbench(self)
+            widget.editorial_requested.connect(self._open_creator_editorial)
+            widget.extraction_requested.connect(self._open_creator_extraction)
+            widget.configure_feishu.connect(self._config_feishu)
+            self.creator_page = widget
+        elif index == CONTENT_WORKBENCH_PAGE:
             from .content_workbench import ContentWorkbench
             widget = ContentWorkbench(self)
             widget.configure_models.connect(self._open_workspace_models)
@@ -1424,6 +1464,7 @@ class MainWindow(QWidget):
         self.workbench_consumer_theme = T.consumer_theme(current.name)
         apply_native_theme(self, previous, current)
         self.setStyleSheet(T.scale_text_style(T.QSS, self._font_percent))
+        self._navigation_style = self.style()
         self._scale_workspace_web_text(self)
         self._sync_toggle_icons()
 
@@ -1440,6 +1481,7 @@ class MainWindow(QWidget):
         self._font_percent = percent
         T.apply_fonts(QApplication.instance(), percent)
         self.setStyleSheet(T.scale_text_style(T.QSS, percent))
+        self._navigation_style = self.style()
         self._scale_workspace_web_text(self)
 
     def _sync_preferences_to_workbench(self, field: str) -> None:
@@ -3914,7 +3956,7 @@ class MainWindow(QWidget):
                 if session.is_active(): return True
             except Exception:
                 return True
-        owners = (self,) + tuple(getattr(self, name, None) for name in ("library_page", "voice_page", "collection_page", "settings_page"))
+        owners = (self,) + tuple(getattr(self, name, None) for name in ("library_page", "voice_page", "collection_page", "settings_page", "creator_page"))
         connection = getattr(getattr(self, "settings_page", None), "feishu_connection", None)
         if connection is not None and any(MainWindow._update_activity_running(w) for w in connection.owned_workers()):
             return True
@@ -4045,6 +4087,7 @@ class MainWindow(QWidget):
                 "voice_page",
                 "collection_page",
                 "settings_page",
+                "creator_page",
             )
         )
         workers: list[QThread] = []
@@ -4166,6 +4209,12 @@ class MainWindow(QWidget):
         return True
 
     def closeEvent(self, e):  # noqa: N802
+        creator = getattr(self, 'creator_page', None)
+        if creator is not None:
+            if creator.is_busy() or not creator.flush():
+                self._toast('选题资料仍在读取，或尚未保存。请处理页面提示后再退出。')
+                e.ignore()
+                return
         editorial = getattr(self, 'content_page', None)
         if editorial is not None:
             if editorial.is_busy():

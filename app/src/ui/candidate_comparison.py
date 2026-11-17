@@ -6,16 +6,18 @@ from PySide6.QtWidgets import (
 )
 
 from .control_foundation import adopt_button, adopt_text_area
+from .sentence_editor import SentenceEditor
 
 
 class CandidatePane(QWidget):
     edit_requested = Signal(str)
     clip_requested = Signal(str, str)
+    sentence_requested = Signal(str, int, int)
 
     def __init__(self, candidate_id, parent=None):
         super().__init__(parent)
         self.candidate_id = candidate_id
-        self.setMinimumWidth(320)
+        self.setMinimumWidth(260)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -30,8 +32,8 @@ class CandidatePane(QWidget):
         self.source.setWordWrap(True)
         self.source.setFixedHeight(36)
         layout.addWidget(self.source)
-        self.body = QPlainTextEdit()
-        self.body.setReadOnly(True)
+        self.body = SentenceEditor()
+        self.body.sentence_picked.connect(lambda start, end: self.sentence_requested.emit(self.candidate_id, start, end))
         adopt_text_area(self.body)
         layout.addWidget(self.body, 1)
         self.score = QLabel()
@@ -50,7 +52,7 @@ class CandidatePane(QWidget):
         actions.addWidget(self.edit_button)
         layout.addLayout(actions)
 
-    def update_candidate(self, candidate, review=None, *, stale=False):
+    def update_candidate(self, candidate, review=None, *, stale=False, clips=()):
         title = candidate['title'] or '未命名文案'
         self.title.setText(title)
         self.title.setToolTip(title)
@@ -66,6 +68,11 @@ class CandidatePane(QWidget):
             scroll = self.body.verticalScrollBar().value()
             self.body.setPlainText(candidate['text'])
             self.body.verticalScrollBar().setValue(scroll)
+        from ..core.content_workbench import digest
+        fingerprint = digest(candidate['text'])
+        self.body.set_picked((clip['sentence_start'], clip['sentence_end']) for clip in clips
+                             if clip['candidate_id'] == self.candidate_id
+                             and clip.get('source_hash') == fingerprint and 'sentence_start' in clip)
         result = next((r for r in (review or {}).get('documents', [])
                        if r['id'] == self.candidate_id), None)
         text = f'整体分：{result["score"]}/100' if result else '未评分'
@@ -82,6 +89,8 @@ class CandidatePane(QWidget):
 class CandidateComparison(QWidget):
     edit_requested = Signal(str)
     clip_requested = Signal(str, str)
+    sentence_requested = Signal(str, int, int)
+    import_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -93,10 +102,14 @@ class CandidateComparison(QWidget):
         self.hint.setObjectName('muted')
         self.hint.setWordWrap(True)
         layout.addWidget(self.hint)
-        self.empty = QLabel('先从左侧选入并勾选至少两篇文案，即可并排比较全文。')
+        self.empty = QLabel('选入 2–3 篇文案，点击句子即可加入右侧新文案。')
         self.empty.setWordWrap(True)
         self.empty.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.empty, 1)
+        self.import_button = QPushButton('从文稿库选入文案')
+        adopt_button(self.import_button)
+        self.import_button.clicked.connect(self.import_requested.emit)
+        layout.addWidget(self.import_button)
         self.scroll = QScrollArea()
         self.scroll.setAccessibleName('文案并排对比，横向滚动查看更多')
         self.scroll.setWidgetResizable(True)
@@ -130,19 +143,21 @@ class CandidateComparison(QWidget):
                 pane = CandidatePane(key, self.content)
                 pane.edit_requested.connect(self.edit_requested.emit)
                 pane.clip_requested.connect(self.clip_requested.emit)
+                pane.sentence_requested.connect(self.sentence_requested.emit)
                 self.panes[key] = pane
             pane = self.panes[key]
             if self.columns.indexOf(pane) != index:
                 self.columns.insertWidget(index, pane, 1)
-            pane.update_candidate(candidate, review, stale=stale)
+            pane.update_candidate(candidate, review, stale=stale, clips=project['clips'])
         count = len(candidates)
         self.empty.setVisible(not count)
+        self.import_button.setVisible(not count)
         self.scroll.setVisible(bool(count))
-        self.content.setMinimumWidth(320 * count + 16 * max(0, count - 1))
+        self.content.setMinimumWidth(260 * count + 16 * max(0, count - 1))
         if count == 1:
             text = '已显示 1 篇；再勾选一篇，即可并排对比。'
         elif count:
-            text = f'已并排显示 {count} 篇 · 各篇可独立滚动、选段；横向滚动查看更多。'
+            text = f'已显示 {count} 篇 · 点击句子即加入右侧；拖动可选段，横向滚动查看更多。'
         else:
             text = '勾选后自动显示全文，无需逐篇打开。'
         if count > 8:

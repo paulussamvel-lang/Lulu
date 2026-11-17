@@ -196,7 +196,7 @@ echo "==> 2/5 校验 macOS 15 MLX 构建输入"
 "$VENV/python" packaging/macos_compatibility.py verify-build-env
 
 "$VENV/python" packaging/profile_gate.py create \
-  --profile "$BUILD_PROFILE" "${EDITION_ARGS[@]}" --version "$VERSION" --build "$BUILD" \
+  --profile "$BUILD_PROFILE" ${EDITION_ARGS[@]+"${EDITION_ARGS[@]}"} --version "$VERSION" --build "$BUILD" \
   --build-venv-root "$VENV_PATH" \
   --output build_profile.json --product-source-output product_source.json
 cleanup_build_profile=1

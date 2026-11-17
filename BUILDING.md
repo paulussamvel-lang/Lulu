@@ -1,6 +1,6 @@
 # 从源码构建 Lulu
 
-本版为 **4.3.4 / 20261109.3**，提供实际产品的完整第一方源码、资源、CLI、后台、Skill 与构建入口。第一方 MIT，第三方保留原许可。无需激活码、维护者私钥或维护者的个人资料。
+本版为 **4.3.4 / 20261117.3**，提供实际产品的完整第一方源码、资源、CLI、后台、Skill 与构建入口。第一方 MIT，第三方保留原许可。无需激活码、维护者私钥或维护者的个人资料。
 
 ## 环境与依赖
 
@@ -39,12 +39,12 @@ tar -xzf app/build/asr-sources/moss-source.tar.gz --strip-components=1 -C app/bu
 ```sh
 .venv/bin/python -B app/packaging/product_capability_gate.py   --repo "$PWD" --output /private/tmp/lulu-product-checks.json
 
-export LULU_BUILD_ROOT="$PWD/app/build/phase10-production-20261109.3"
-export LULU_DIST_ROOT="$PWD/app/dist/phase10-production-20261109.3"
+export LULU_BUILD_ROOT="$PWD/app/build/phase10-production-20261117.3"
+export LULU_DIST_ROOT="$PWD/app/dist/phase10-production-20261117.3"
 export LULU_PRODUCTION_RELEASE_AUTHORIZED=1
 export LULU_UPDATE_RELEASE=0
 export LULU_UPDATE_PUBLIC_KEY_PATH="$PWD/app/packaging/update-verification-key.pem"
-/bin/zsh app/packaging/build_app.sh --identity production --venv "$PWD/.venv"
+/bin/bash app/packaging/build_app.sh --identity production --venv "$PWD/.venv"
 ```
 
 打包时会再次执行正式产品检查、源码与运行依赖校验、隐私、签名和包内检查。构建开关只确认要生成产品包，不上传或发布。随源码提供的 RSA 验证公钥来自正式 App，可公开；官方更新签署私钥由维护者保存在源码仓库外，构建无需该私钥。

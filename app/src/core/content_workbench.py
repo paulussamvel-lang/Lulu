@@ -32,6 +32,42 @@ def paragraphs(text):
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
+def sentence_spans(text):
+    """Return occurrence offsets without rewriting punctuation or repetitions."""
+    boundaries = re.finditer(r'[。！？!?；;]+[”’」』"\')）]*|(?<!\d)\.(?=\s|$)|…{2,}|\n+', text)
+    spans, start = [], 0
+    for boundary in boundaries:
+        end = boundary.start() if boundary.group().startswith('\n') else boundary.end()
+        a, b = start, end
+        while a < b and text[a].isspace(): a += 1
+        while b > a and text[b-1].isspace(): b -= 1
+        if a < b: spans.append((a, b))
+        start = boundary.end()
+    a, b = start, len(text)
+    while a < b and text[a].isspace(): a += 1
+    while b > a and text[b-1].isspace(): b -= 1
+    if a < b: spans.append((a, b))
+    return spans
+
+
+def pick_sentence(project, candidate_id, start, end):
+    candidate = next(c for c in project['candidates'] if c['id'] == candidate_id)
+    if (start, end) not in sentence_spans(candidate['text']):
+        raise ValueError('这句原文已变化，请重新点选。')
+    clip = add_clip(project, candidate_id, candidate['text'][start:end])
+    clip.update(sentence_start=start, sentence_end=end, original_text=clip['text'])
+    return clip
+
+
+def append_clip_to_draft(project, clip):
+    """Append only: manual writing and earlier fine edits remain byte-for-byte."""
+    draft = project['draft']
+    separator = '' if not draft or draft.endswith('\n\n') else ('\n' if draft.endswith('\n') else '\n\n')
+    insertion = separator + clip['text']
+    project['draft'] = draft + insertion
+    return insertion
+
+
 def new_project(title='未命名选题'):
     return dict(id=uuid4().hex, title=title, audience='', family='', candidates=[],
                 clips=[], draft='', draft_history=[], review=None, updated_at=stamp())

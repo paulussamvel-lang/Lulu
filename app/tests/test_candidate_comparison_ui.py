@@ -40,7 +40,8 @@ def test_both_full_texts_visible_and_excerpt_uses_its_own_source(workbench):
     assert panes[first['id']].body.toPlainText() == first['text']
     assert panes[second['id']].body.toPlainText() == second['text']
     assert panes[first['id']].geometry().right() < panes[second['id']].x()
-    assert not widget.assembly_panel.isVisible()
+    assert widget.assembly_panel.isVisible()
+    assert not widget.candidate_panel.isVisible()
     # The single-editor selection is second, but extract from first directly.
     assert widget.candidate['id'] == second['id']
     pane = panes[first['id']]
