@@ -17,7 +17,10 @@ import sqlite3
 from urllib.parse import parse_qs, quote, urlsplit, urlunsplit, urljoin
 from uuid import uuid4
 
-STATUSES = ('待筛选', '候选', '确定制作', '暂存', '已完成', '不采用')
+PENDING_STATUS = '待筛'
+STATUSES = (PENDING_STATUS, '候选', '确定制作', '暂存', '已完成', '不采用')
+STATUS_ALIASES = {'待选': PENDING_STATUS, '待筛选': PENDING_STATUS, '制作中': '确定制作',
+                  '已排除': '不采用', '排除': '不采用', '已入选': '候选', '已选': '候选', '待定': '暂存'}
 DIMENSIONS = ('开头', '内容顺序', '文案', '画面', '剪辑', '结尾')
 BRIEF_FIELDS = ('目标观众', '具体痛点', '观众收获', '我的切入点', '证据与待核实', '制作成本与条件')
 MAX_BYTES = 4 * 1024 * 1024
@@ -76,7 +79,7 @@ def new_topic(title, source='', text='', source_key=''):
         source = clean_url(source)
     if not str(title).strip():
         raise ValueError('请填写选题名称。')
-    return dict(id=uuid4().hex, title=str(title).strip()[:200], status='待筛选', tags='',
+    return dict(id=uuid4().hex, title=str(title).strip()[:200], status=PENDING_STATUS, tags='',
                 brief={key: '' for key in BRIEF_FIELDS}, decision='',
                 sources=[dict(id=uuid4().hex, title=str(title)[:200], location=source,
                               key=source_key or identity(source) or 'manual:' + uuid4().hex,
@@ -127,7 +130,10 @@ class CreatorStore:
 
     def topics(self):
         with self.connect() as db:
-            return [json.loads(row[0]) for row in db.execute('SELECT payload FROM topics ORDER BY rowid DESC')]
+            topics = [json.loads(row[0]) for row in db.execute('SELECT payload FROM topics ORDER BY rowid DESC')]
+        for topic in topics:
+            topic['status'] = STATUS_ALIASES.get(topic['status'], topic['status'])
+        return topics
 
     def save(self, topic):
         if topic['status'] not in STATUSES:
@@ -159,7 +165,8 @@ class CreatorStore:
             db.execute('BEGIN IMMEDIATE')
             for row in rows:
                 topic = new_topic(row['title'], row.get('source', ''), row.get('text', ''), row.get('key', ''))
-                topic['status'] = row.get('status', '待筛选')
+                status = row.get('status', PENDING_STATUS)
+                topic['status'] = STATUS_ALIASES.get(status, status)
                 if topic['status'] not in STATUSES:
                     raise ValueError('导入记录的状态无法识别，未收录。')
                 topic['tags'] = row.get('tags', '')
@@ -208,8 +215,9 @@ def rows_from_records(records, *, title_field='', link_field='', origin=''):
         if origin and source == origin and not key:
             key = identity(origin) + ':row:' + hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         original_status = fields.get('状态') or fields.get('制作状态') or fields.get('status') or ''
-        status = {'待选':'待筛选', '已排除':'不采用', '排除':'不采用', '已入选':'候选',
-                  '已选':'候选', '待定':'暂存', **{k:k for k in STATUSES}}.get(original_status, '待筛选')
+        status = STATUS_ALIASES.get(original_status, original_status)
+        if status not in STATUSES:
+            status = PENDING_STATUS
         output.append(dict(title=title, source=source, key=key, status=status,
                            tags=fields.get('标签', fields.get('tags', '')),
                            decision=fields.get('排除原因') or fields.get('筛选理由') or '',

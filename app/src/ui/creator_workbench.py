@@ -3,7 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 import threading
 
-from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import creator_workbench as core
+from ..core.creator_status_sync import SYNC_INTERVAL_MS, TopicStatusSync
 from . import theme as T
 from .control_foundation import (
     adopt_button, adopt_list_widget, adopt_select_field, adopt_text_area,
@@ -178,7 +179,7 @@ class ImportPreview(CreatorDialog):
                 link_field=self.link_column.currentText() if self.link_column.currentIndex() else '__none__',
                 origin=self.preview['origin']) if self.preview['kind'] == 'records' else self.preview['rows'])
             for row in self.rows:
-                item = QListWidgetItem(row['title'] + ' · ' + row.get('status', '待筛选')); item.setCheckState(Qt.Checked)
+                item = QListWidgetItem(row['title'] + ' · ' + row.get('status', core.PENDING_STATUS)); item.setCheckState(Qt.Checked)
                 self.list.addItem(item)
             self.notice.setText(f'读取到 {len(self.rows)} 条。请选择要收录的选题。')
             self.accept_button.setEnabled(bool(self.rows)); self.list.setCurrentRow(0)
@@ -244,8 +245,21 @@ class CreatorWorkbench(QWidget):
                           f'QTabBar::tab:selected{{background:{T.CARD};color:{T.INK};border-bottom:2px solid {T.TERRA};}}')
         self.store = core.CreatorStore(root); self.topic = None; self.saved = None
         self.loading = False; self.worker = None; self.player = None; self.image = None
+        self.status_sync = TopicStatusSync(self.store)
+        self.status_sync_url = self.status_sync.configured_url()
+        self.sync_worker = None
+        self.sync_timer = QTimer(self)
+        self.sync_timer.setInterval(SYNC_INTERVAL_MS)
+        self.sync_timer.timeout.connect(self.start_status_sync)
+        self.sync_trigger = QTimer(self)
+        self.sync_trigger.setSingleShot(True)
+        self.sync_trigger.timeout.connect(self.start_status_sync)
         self.timer = QTimer(self); self.timer.setSingleShot(True); self.timer.setInterval(500)
         self.timer.timeout.connect(self.flush)
+        self.list_refresh = QTimer(self)
+        self.list_refresh.setSingleShot(True)
+        self.list_refresh.timeout.connect(self.refresh_list)
+        self.applied_filter = (0, '')
         layout = QVBoxLayout(self); layout.setContentsMargins(26, 20, 26, 22); layout.setSpacing(12)
         header, _, _ = build_consumer_page_header('选题与拆解', '01 选题收录与筛选   →   02 对标视频拆解   →   03 文案')
         layout.addWidget(header)
@@ -254,12 +268,15 @@ class CreatorWorkbench(QWidget):
         intake.addWidget(button('导入本地文件', self.import_local))
         intake.addWidget(button('导入网页 / 飞书', self.import_url))
         intake.addWidget(button('导出当前记录', self.export_topic)); intake.addStretch()
+        intake.addWidget(button('同步飞书状态', self.request_status_sync))
         self.intake_row = intake; layout.addLayout(intake)
         split = QSplitter(Qt.Horizontal); split.setChildrenCollapsible(False); layout.addWidget(split, 1)
         left = QWidget(); left.setMinimumWidth(210); ll = QVBoxLayout(left); ll.setContentsMargins(0,0,6,0)
         self.search = field('搜索选题', '搜索标题、标签、来源和内容')
         self.search.textChanged.connect(self.refresh_list); ll.addWidget(self.search)
-        self.filter = combo('筛选状态', ('全部状态', *core.STATUSES))
+        self.filter = combo('按状态筛选', ('全部状态', *core.STATUSES))
+        filter_label = QLabel('按状态筛选'); filter_label.setBuddy(self.filter)
+        ll.addWidget(filter_label)
         self.filter.currentIndexChanged.connect(self.refresh_list); ll.addWidget(self.filter)
         self.list = QListWidget(); adopt_list_widget(self.list, accessible_name='选题库')
         self.list.currentItemChanged.connect(self.select_topic); ll.addWidget(self.list, 1)
@@ -269,8 +286,10 @@ class CreatorWorkbench(QWidget):
         self.empty.setAlignment(Qt.AlignCenter); self.empty.setWordWrap(True); rr.addWidget(self.empty)
         self.details = QWidget(); dl = QVBoxLayout(self.details); dl.setContentsMargins(0,0,0,0); rr.addWidget(self.details,1)
         self.title = field('选题名称', '给这个选题一个清楚的名称'); dl.addWidget(self.title)
-        top = QHBoxLayout(); self.status = combo('选题状态', core.STATUSES)
+        top = QHBoxLayout(); self.status = combo('当前选题状态', core.STATUSES)
+        status_label = QLabel('当前选题状态'); status_label.setBuddy(self.status)
         self.tags = field('选题标签', '标签，例如：工具实测、效率、入门')
+        top.addWidget(status_label)
         top.addWidget(self.status); top.addWidget(self.tags,1)
         top.addWidget(button('进入文案精选 →', self.open_editorial, True)); dl.addLayout(top)
         self.tabs = QTabWidget(); self.tabs.setAccessibleName('创作阶段'); dl.addWidget(self.tabs,1)
@@ -278,8 +297,13 @@ class CreatorWorkbench(QWidget):
         split.addWidget(self.right); split.setSizes([250, 900]); split.setStretchFactor(1,1)
         self.notice = QLabel('资料保存在本机；网页读取与飞书导入仅在点击后进行。')
         self.notice.setWordWrap(True); layout.addWidget(self.notice)
+        self.sync_notice = QLabel()
+        self.sync_notice.setWordWrap(True)
+        self.sync_notice.setVisible(bool(self.status_sync_url))
+        layout.addWidget(self.sync_notice)
         for item in (self.title, self.tags): item.textEdited.connect(self.changed)
         self.status.currentIndexChanged.connect(self.changed)
+        self.status.activated.connect(self.apply_topic_status)
         self.refresh_list()
 
     def build_brief(self):
@@ -366,19 +390,30 @@ class CreatorWorkbench(QWidget):
     def changed(self, *_):
         if not self.loading and self.topic: self.timer.start()
 
+    def apply_topic_status(self, _index):
+        # Choosing the already saved status is also a request to show that group.
+        if self.topic and not self.loading and self.flush():
+            self.filter.setCurrentText(self.topic['status'])
+
     def capture(self):
         if not self.topic: return
         self.topic.update(title=self.title.text(), tags=self.tags.text(), status=self.status.currentText(),
             brief={k:w.toPlainText() for k,w in self.brief.items()}, decision=self.decision.toPlainText(),
             analysis={k:w.toPlainText() for k,w in self.analysis.items()}, transcript=self.transcript.toPlainText())
 
-    def flush(self):
+    def flush(self, *, follow_status=True):
         self.timer.stop()
         if self.loading or not self.topic: return True
         self.capture()
         if self.topic == self.saved: return True
+        status_changed = self.topic['status'] != self.saved['status']
         try:
             self.store.save(self.topic); self.saved = deepcopy(self.topic)
+            if follow_status and status_changed and self.filter.currentText() != self.topic['status']:
+                with QSignalBlocker(self.filter):
+                    self.filter.setCurrentText(self.topic['status'])
+                    self.filter.setToolTip(self.topic['status'])
+                self.list_refresh.start(0)
             # Qt selects the destination before currentItemChanged is emitted.
             # Publish edits only into the row belonging to the saved topic.
             for row in range(self.list.count()):
@@ -386,25 +421,111 @@ class CreatorWorkbench(QWidget):
                 if item.data(Qt.UserRole)['id'] == self.topic['id']:
                     item.setText(self.topic['title'] + '\n' + self.topic['status'])
                     item.setData(Qt.UserRole, deepcopy(self.topic))
+                    if not self.matches_filter(self.topic, self.search.text().strip().casefold()):
+                        # Let currentItemChanged finish before replacing its list items.
+                        self.list_refresh.start(0)
                     break
+            if status_changed and self.status_sync_url:
+                self.sync_notice.setText('飞书状态待同步')
+                self.sync_trigger.start(400)
             self.error('已保存到本机。'); return True
         except (OSError, ValueError) as exc:
             self.error(str(exc)); return False
 
+    def matches_filter(self, topic, term):
+        return (not self.filter.currentIndex() or topic['status'] == self.filter.currentText()) and (
+            not term or term in str(topic).casefold())
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self.status_sync_url:
+            if not self.sync_timer.isActive():
+                self.sync_timer.start()
+            self.sync_trigger.start(400)
+
+    def request_status_sync(self):
+        if not self.status_sync_url:
+            url, ok = prompt_text(self, '同步飞书状态', '粘贴已导入的飞书数据表链接')
+            if not ok:
+                return
+            try:
+                self.status_sync.configure(url)
+            except ValueError as exc:
+                self.error(str(exc))
+                return
+            self.status_sync_url = self.status_sync.configured_url()
+            self.sync_notice.show()
+            self.sync_timer.start()
+        self.start_status_sync()
+
+    def start_status_sync(self):
+        if not self.status_sync_url:
+            return
+        if self.sync_worker is not None or self.is_busy():
+            self.sync_trigger.start(1200)
+            return
+        if not self.flush():
+            self.sync_notice.setText('请先保存当前选题，再同步飞书状态。')
+            return
+        self.sync_trigger.stop()
+        self.sync_notice.setText('正在同步飞书状态…')
+        self.sync_worker = ImportWorker(self.status_sync.sync, self.status_sync_url, self)
+        self.sync_worker.completed.connect(self.apply_status_sync)
+        self.sync_worker.failed.connect(self.sync_notice.setText)
+        self.sync_worker.finished.connect(self.finish_status_sync)
+        self.sync_worker.start()
+
+    def apply_status_sync(self, result):
+        target, changes, conflicts, missing, pushed, unconfirmed = result
+        if not self.flush():
+            self.sync_notice.setText('请先保存当前选题，再同步飞书状态。')
+            return
+        try:
+            pulled = self.status_sync.apply(target, changes)
+        except ValueError as exc:
+            self.sync_notice.setText(str(exc))
+            return
+        if pulled:
+            self.refresh_list()
+        message = f'飞书状态已检查 · 写回 {pushed} 条 · 更新本机 {pulled} 条'
+        if missing:
+            message += f' · {missing} 条来源记录找不到'
+        if unconfirmed:
+            message += f' · {unconfirmed} 条待确认'
+        if conflicts:
+            by_id = {topic['id']: topic['title'] for topic in self.store.topics()}
+            topic_id, local, cloud = conflicts[0]
+            message += (f' · {len(conflicts)} 条状态冲突，已保留双方修改。'
+                        f'「{by_id.get(topic_id, "选题")}」本机为{local}，飞书为{cloud or "未知状态"}。')
+        self.sync_notice.setText(message)
+
+    def finish_status_sync(self):
+        self.sync_worker.deleteLater()
+        self.sync_worker = None
+
     def refresh_list(self, *_):
-        if self.topic and not self.flush(): return
+        if not self.flush(follow_status=False):
+            index, term = self.applied_filter
+            with QSignalBlocker(self.filter), QSignalBlocker(self.search):
+                self.filter.setCurrentIndex(index)
+                self.filter.setToolTip(self.filter.currentText())
+                self.search.setText(term)
+            return
+        self.list_refresh.stop()
+        self.applied_filter = (self.filter.currentIndex(), self.search.text())
         current = self.topic['id'] if self.topic else ''
         rows = self.store.topics(); term = self.search.text().strip().casefold()
         self.list.blockSignals(True); self.list.clear()
         for topic in rows:
-            if self.filter.currentIndex() and topic['status'] != self.filter.currentText(): continue
-            if term and term not in str(topic).casefold(): continue
+            if not self.matches_filter(topic, term): continue
             item = QListWidgetItem(topic['title'] + '\n' + topic['status']); item.setData(Qt.UserRole, topic)
             self.list.addItem(item)
             if topic['id'] == current: self.list.setCurrentItem(item)
         if self.list.currentRow() < 0 and self.list.count(): self.list.setCurrentRow(0)
         self.list.blockSignals(False)
         self.count.setText(f'显示 {self.list.count()} / 共 {len(rows)} 个选题')
+        self.empty.setText('没有符合当前条件的选题' if rows else
+                           '从一个具体问题开始\n\n新建选题，或导入已有文件、页面和飞书资料。')
         self.select_topic(self.list.currentItem())
 
     def select_topic(self, item, previous=None):
@@ -653,4 +774,5 @@ class CreatorWorkbench(QWidget):
                 w.setPlainText((old+'\n\n' if old else '')+'【AI 文字建议】\n'+result[k])
             self.flush()
 
-    def is_busy(self): return self.worker is not None and self.worker.isRunning()
+    def is_busy(self):
+        return any(worker is not None and worker.isRunning() for worker in (self.worker, self.sync_worker))

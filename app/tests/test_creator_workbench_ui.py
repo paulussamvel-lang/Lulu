@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from src.core import creator_workbench as core
@@ -44,6 +45,55 @@ def test_immediate_selection_before_autosave_opens_destination(app,tmp_path):
     rows = {t['id']:t for t in store.topics()}
     assert rows[source_id]['brief']['具体痛点'] == '尚未触发计时器的编辑'
     assert rows[target_id]['brief']['具体痛点'] == ''
+    page.close()
+
+
+def test_status_filter_updates_after_edit_and_reflects_failed_save(app, tmp_path):
+    store = core.CreatorStore(tmp_path)
+    store.import_rows([
+        {'title': '待判断的选题', 'source': 'https://example.test/a'},
+        {'title': '完成的选题', 'source': 'https://example.test/b', 'status': '已完成'},
+    ])
+    page = CreatorWorkbench(root=tmp_path)
+    page.filter.setCurrentText(core.PENDING_STATUS)
+    assert page.list.count() == 1
+    assert page.topic['title'] == '待判断的选题'
+
+    page.status.setCurrentText('候选')
+    QTest.qWait(650)
+    assert page.filter.currentText() == '候选'
+    assert page.list.count() == 1
+    assert page.topic['title'] == '待判断的选题'
+    page.filter.setCurrentText('全部状态')
+    page.list.setCurrentRow(1)
+    assert page.filter.currentText() == '全部状态'
+    page.list.setCurrentRow(0)
+    assert page.topic['title'] == '待判断的选题'
+    page.status.activated.emit(page.status.currentIndex())
+    assert page.filter.currentText() == '候选'
+    assert page.list.count() == 1
+
+    page.status.setCurrentText('不采用')
+    page.filter.setCurrentText('已完成')
+    assert page.filter.currentText() == '候选'
+    assert page.status.currentText() == '不采用'
+    assert '原因' in page.notice.text()
+
+    page.decision.setPlainText('素材不足')
+    assert page.flush()
+    app.processEvents()
+    assert page.filter.currentText() == '不采用'
+    assert page.list.count() == 1
+    assert page.count.text() == '显示 1 / 共 2 个选题'
+    assert page.topic['title'] == '待判断的选题'
+    assert page.topic['decision'] == '素材不足'
+    page.filter.setCurrentText('已完成')
+    assert page.topic['title'] == '完成的选题'
+    page.filter.setCurrentText('暂存')
+    assert page.list.count() == 0
+    assert '没有符合' in page.empty.text()
+    page.filter.setCurrentText('全部状态')
+    assert page.list.count() == 2
     page.close()
 
 
