@@ -874,7 +874,7 @@ class MainWindow(QWidget):
         lay.addWidget(self._nav_label("工作台"))
         from .workbench_navigation import WorkbenchNavigation
         self.workbench_navigation = WorkbenchNavigation(self.workbench_consumer_theme)
-        for ico, text, index in (("workspace_grid", "选题与拆解", CREATOR_WORKBENCH_PAGE),
+        for ico, text, index in (("workspace_grid", "视频制作", CREATOR_WORKBENCH_PAGE),
                                  ("file", "文案精选", CONTENT_WORKBENCH_PAGE),
                                  ("headphones", "内容提取", 0), ("workspace_grid", "主页采集", 5),
                                  ("mic", "文案配音", 4), ("video", "直播录制", LIVE_RECORDING_PAGE)):

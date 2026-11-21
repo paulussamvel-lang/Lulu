@@ -379,7 +379,7 @@ def validate_segment(value, duration=0):
                 **{k: str(value.get(k, '')) for k in ('role', 'copy', 'visual', 'edit', 'borrow')})
 
 
-def topic_markdown(topic):
+def topic_markdown(topic, *, include_workflow=False):
     lines = [f'# {topic["title"]}', f'状态：{topic["status"]}', '']
     for key in BRIEF_FIELDS:
         lines += [f'## {key}', topic['brief'].get(key, '') or '待补充', '']
@@ -392,6 +392,9 @@ def topic_markdown(topic):
         lines += ['', f'### {time_text(segment["start_ms"])}–{time_text(segment["end_ms"])} {segment["role"]}']
         lines += [f'{name}：{segment.get(key, "")}' for key, name in [('copy','文案'),('visual','画面'),('edit','剪辑'),('borrow','可借鉴')]]
     if topic['transcript'].strip(): lines += ['', '## 参考逐字稿', topic['transcript']]
+    if include_workflow:
+        from .creator_workflow import workflow_markdown
+        lines.extend(workflow_markdown(topic.get('workflow', {})))
     return '\n'.join(lines)
 
 

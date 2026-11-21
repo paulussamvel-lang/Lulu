@@ -1,4 +1,4 @@
-"""Topic → benchmark analysis → editorial, using the incumbent native controls."""
+"""Video production and benchmark analysis using the incumbent native controls."""
 from copy import deepcopy
 from pathlib import Path
 import threading
@@ -6,15 +6,16 @@ import threading
 from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QPalette, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDialog, QDialogButtonBox,
+    QApplication, QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
-    QScrollArea, QSlider, QSplitter, QTableWidget, QTableWidgetItem,
+    QScrollArea, QSizePolicy, QSlider, QSplitter, QTableWidget, QTableWidgetItem,
     QTabWidget, QVBoxLayout, QWidget,
 )
 
 from ..core import creator_workbench as core
 from ..core.creator_status_sync import SYNC_INTERVAL_MS, TopicStatusSync
+from ..core.creator_workflow import COMMERCIAL, STAGES
 from . import theme as T
 from .control_foundation import (
     adopt_button, adopt_list_widget, adopt_select_field, adopt_text_area,
@@ -100,6 +101,145 @@ def combo(name, items):
     adopt_select_field(widget, accessible_name=name)
     widget.addItems(items)
     return widget
+
+
+class WorkflowPane(QWidget):
+    changed = Signal()
+
+    def __init__(self, stage):
+        super().__init__()
+        self.stage = stage
+        self.records = {}
+        self.active_index = -1
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        artifact = QLabel(f'阶段产物 · {stage.artifact}')
+        artifact.setWordWrap(True)
+        layout.addWidget(artifact)
+
+        split = QSplitter(Qt.Horizontal)
+        split.setChildrenCollapsible(False)
+        layout.addWidget(split, 1)
+        navigation = QWidget()
+        navigation.setMinimumWidth(154)
+        nav_layout = QVBoxLayout(navigation)
+        nav_layout.setContentsMargins(0, 0, 8, 0)
+        self.steps = QListWidget()
+        adopt_list_widget(self.steps, accessible_name=f'{stage.title}的步骤')
+        self.steps.setWordWrap(True)
+        self.steps.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.steps.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        nav_layout.addWidget(self.steps, 1)
+        self.progress = QLabel()
+        nav_layout.addWidget(self.progress)
+        split.addWidget(navigation)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        split.addWidget(scroll)
+        split.setStretchFactor(1, 1)
+        split.setSizes([226, 455])
+        content = QWidget()
+        body = QVBoxLayout(content)
+        body.setContentsMargins(8, 0, 6, 2)
+        body.setSpacing(8)
+        self.title = QLabel()
+        title_font = self.title.font()
+        title_font.setBold(True)
+        self.title.setFont(title_font)
+        self.guide = QLabel()
+        self.result = QLabel()
+        for label in (self.title, self.guide, self.result):
+            label.setWordWrap(True)
+            body.addWidget(label)
+
+        controls = QHBoxLayout()
+        self.complete = QCheckBox('标记本步完成')
+        controls.addWidget(self.complete)
+        controls.addStretch()
+        self.copy_prompt = button('复制提示词与输入', self.copy_current_prompt)
+        self.copy_prompt.setVisible(any(step.prompt for step in stage.steps))
+        controls.addWidget(self.copy_prompt)
+        body.addLayout(controls)
+
+        self.input = editor('输入与依据')
+        self.output = editor('本步产物与记录')
+        for label_text, widget in (('输入与依据', self.input), ('本步产物与记录', self.output)):
+            label = QLabel(label_text)
+            label.setBuddy(widget)
+            body.addWidget(label)
+            widget.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+            widget.setMinimumHeight(68)
+            widget.setProperty('workflowField', True)
+            body.addWidget(widget, 1)
+            widget.textChanged.connect(self.record_step)
+        self.complete.toggled.connect(self.record_step)
+        scroll.setWidget(content)
+        for _ in stage.steps:
+            self.steps.addItem(QListWidgetItem())
+        self.steps.currentRowChanged.connect(self.show_step)
+        self.steps.setCurrentRow(0)
+        self.refresh_step_labels()
+
+    def refresh_step_labels(self):
+        completed = 0
+        for index, step in enumerate(self.stage.steps):
+            done = self.records.get(step.key, {}).get('done', False)
+            completed += bool(done)
+            item = self.steps.item(index)
+            label = f'{index + 1}. {step.title}' + (' · 已完成' if done else '')
+            item.setText(label)
+            item.setToolTip(label)
+        self.progress.setText(f'{completed} / {len(self.stage.steps)} 步完成')
+
+    def load(self, records):
+        self.records = {
+            step.key: deepcopy(records[step.key])
+            for step in self.stage.steps if isinstance(records.get(step.key), dict)
+        }
+        self.refresh_step_labels()
+        self.show_step(self.steps.currentRow())
+
+    def show_step(self, index):
+        self.active_index = index
+        if index < 0:
+            return
+        step = self.stage.steps[index]
+        record = self.records.get(step.key, {})
+        self.title.setText(step.title)
+        self.guide.setText(step.guidance)
+        self.result.setText(f'本步产物 · {step.artifact}')
+        self.input.setPlaceholderText(step.input_hint)
+        self.output.setPlaceholderText(step.output_hint)
+        prompt = self.copy_prompt
+        prompt.setText('复制提示词与输入')
+        prompt.setEnabled(bool(step.prompt))
+        with QSignalBlocker(self.input), QSignalBlocker(self.output), QSignalBlocker(self.complete):
+            self.input.setPlainText(record.get('input', ''))
+            self.output.setPlainText(record.get('output', ''))
+            self.complete.setChecked(bool(record.get('done', False)))
+
+    def record_step(self, *_):
+        if self.active_index < 0:
+            return
+        step = self.stage.steps[self.active_index]
+        record = dict(self.records.get(step.key, {}), input=self.input.toPlainText(),
+                      output=self.output.toPlainText(), done=self.complete.isChecked())
+        if record['input'] or record['output'] or record['done'] or len(record) > 3:
+            self.records[step.key] = record
+        else:
+            self.records.pop(step.key, None)
+        self.refresh_step_labels()
+        self.changed.emit()
+
+    def copy_current_prompt(self):
+        if self.active_index >= 0:
+            prompt = self.stage.steps[self.active_index].prompt
+            if self.input.toPlainText().strip():
+                prompt += '\n\n本步输入与依据\n' + self.input.toPlainText()
+            QApplication.clipboard().setText(prompt)
+            self.copy_prompt.setText('已复制')
 
 
 class ImportWorker(QThread):
@@ -242,7 +382,9 @@ class CreatorWorkbench(QWidget):
         self.setStyleSheet(f'QWidget#creatorWorkbench{{background:{T.BG};color:{T.INK};}}'
                           f'QTabWidget::pane{{background:{T.BG};border:1px solid {T.LINE};}}'
                           f'QTabBar::tab{{background:{T.BG_DEEP};color:{T.INK};padding:7px 12px;border:1px solid {T.LINE};}}'
-                          f'QTabBar::tab:selected{{background:{T.CARD};color:{T.INK};border-bottom:2px solid {T.TERRA};}}')
+                          f'QTabBar::tab:selected{{background:{T.CARD};color:{T.INK};border-bottom:2px solid {T.TERRA};}}'
+                          f'QPlainTextEdit[workflowField="true"]{{background:{T.CARD};border:1px solid {T.LINE};border-radius:8px;}}'
+                          f'QPlainTextEdit[workflowField="true"]:focus{{border-color:{T.TERRA};}}')
         self.store = core.CreatorStore(root); self.topic = None; self.saved = None
         self.loading = False; self.worker = None; self.player = None; self.image = None
         self.status_sync = TopicStatusSync(self.store)
@@ -261,7 +403,7 @@ class CreatorWorkbench(QWidget):
         self.list_refresh.timeout.connect(self.refresh_list)
         self.applied_filter = (0, '')
         layout = QVBoxLayout(self); layout.setContentsMargins(26, 20, 26, 22); layout.setSpacing(12)
-        header, _, _ = build_consumer_page_header('选题与拆解', '01 选题收录与筛选   →   02 对标视频拆解   →   03 文案')
+        header, _, _ = build_consumer_page_header('视频制作工作台', '选定左侧项目，记录每个阶段的步骤与产物。')
         layout.addWidget(header)
         intake = QHBoxLayout()
         intake.addWidget(button('新建选题', self.new_topic, True))
@@ -292,8 +434,23 @@ class CreatorWorkbench(QWidget):
         top.addWidget(status_label)
         top.addWidget(self.status); top.addWidget(self.tags,1)
         top.addWidget(button('进入文案精选 →', self.open_editorial, True)); dl.addLayout(top)
-        self.tabs = QTabWidget(); self.tabs.setAccessibleName('创作阶段'); dl.addWidget(self.tabs,1)
+        self.production_tabs = QTabWidget()
+        self.production_tabs.setAccessibleName('视频制作阶段')
+        dl.addWidget(self.production_tabs, 1)
+        self.workflow_panes = [WorkflowPane(stage) for stage in (*STAGES, COMMERCIAL)]
+        for pane in self.workflow_panes:
+            pane.changed.connect(self.changed)
+        topics, writing, shooting, editing, releasing, commercial = self.workflow_panes
+        self.tabs = QTabWidget()
+        self.tabs.setAccessibleName('选题和拆解资料')
+        self.tabs.addTab(topics, '流程与选题卡')
         self.build_brief(); self.build_analysis(); self.build_sources()
+        script_tabs = QTabWidget()
+        script_tabs.setAccessibleName('文案与商单流程')
+        script_tabs.addTab(writing, '通用文案')
+        script_tabs.addTab(commercial, COMMERCIAL.title)
+        for index, (stage, page) in enumerate(zip(STAGES, (self.tabs, script_tabs, shooting, editing, releasing)), 1):
+            self.production_tabs.addTab(page, f'{index} {stage.title}')
         split.addWidget(self.right); split.setSizes([250, 900]); split.setStretchFactor(1,1)
         self.notice = QLabel('资料保存在本机；网页读取与飞书导入仅在点击后进行。')
         self.notice.setWordWrap(True); layout.addWidget(self.notice)
@@ -323,7 +480,7 @@ class CreatorWorkbench(QWidget):
         self.decision = editor('筛选理由', '保留、暂存或不采用的理由；不采用时请填写。')
         self.decision.setMaximumHeight(100); self.decision.textChanged.connect(self.changed)
         form.addRow('筛选理由', self.decision); scroll.setWidget(page)
-        self.tabs.addTab(scroll, '01 选题判断')
+        self.tabs.addTab(scroll, '选题判断')
 
     def build_analysis(self):
         page = QWidget(); layout = QVBoxLayout(page); layout.setContentsMargins(10,10,10,10)
@@ -373,7 +530,7 @@ class CreatorWorkbench(QWidget):
         self.segments.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.segments.cellDoubleClicked.connect(self.jump_segment)
         lo.addWidget(self.segments,1); split.addWidget(lower); split.setSizes([340,180])
-        self.tabs.addTab(page, '02 视频拆解')
+        self.tabs.addTab(page, '视频拆解')
 
     def build_sources(self):
         page = QWidget(); layout = QVBoxLayout(page)
@@ -400,6 +557,13 @@ class CreatorWorkbench(QWidget):
         self.topic.update(title=self.title.text(), tags=self.tags.text(), status=self.status.currentText(),
             brief={k:w.toPlainText() for k,w in self.brief.items()}, decision=self.decision.toPlainText(),
             analysis={k:w.toPlainText() for k,w in self.analysis.items()}, transcript=self.transcript.toPlainText())
+        records = dict(self.topic.get('workflow', {}))
+        for pane in self.workflow_panes:
+            for step in pane.stage.steps:
+                records.pop(step.key, None)
+            records.update(pane.records)
+        if records or 'workflow' in self.topic:
+            self.topic['workflow'] = records
 
     def flush(self, *, follow_status=True):
         self.timer.stop()
@@ -538,6 +702,8 @@ class CreatorWorkbench(QWidget):
         self.topic = deepcopy(item.data(Qt.UserRole)) if item else None
         self.saved = deepcopy(self.topic)
         self.details.setVisible(bool(self.topic)); self.empty.setVisible(not self.topic)
+        for pane in self.workflow_panes:
+            pane.load(self.topic.get('workflow', {}) if self.topic else {})
         if self.topic:
             self.title.setText(self.topic['title']); self.tags.setText(self.topic['tags'])
             self.status.setCurrentText(self.topic['status']); self.decision.setPlainText(self.topic['decision'])
@@ -719,7 +885,7 @@ class CreatorWorkbench(QWidget):
         self.capture()
         path,_ = QFileDialog.getSaveFileName(self,'导出选题与拆解','','Markdown (*.md)')
         if path:
-            try: Path(path).write_text(core.topic_markdown(self.topic),encoding='utf-8'); self.error('已导出当前选题与拆解。')
+            try: Path(path).write_text(core.topic_markdown(self.topic, include_workflow=True),encoding='utf-8'); self.error('已导出当前选题和制作记录。')
             except OSError: self.error('导出失败，请选择可写的保存位置。')
 
     def assist_analysis(self):

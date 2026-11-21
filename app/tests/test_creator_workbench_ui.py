@@ -9,6 +9,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from src.core import creator_workbench as core
+from src.core.creator_workflow import COMMERCIAL, STAGES
 from src.ui.creator_workbench import CreatorWorkbench, ImportPreview
 from src.ui.content_workbench import ContentWorkbench
 
@@ -46,6 +47,67 @@ def test_immediate_selection_before_autosave_opens_destination(app,tmp_path):
     assert rows[source_id]['brief']['具体痛点'] == '尚未触发计时器的编辑'
     assert rows[target_id]['brief']['具体痛点'] == ''
     page.close()
+
+
+def test_production_navigation_and_autosave_keep_older_projects(app, tmp_path):
+    store = core.CreatorStore(tmp_path)
+    for title in ('早期项目', '本期选题'):
+        topic = core.new_topic(title, 'https://example.test/' + ('old' if title == '早期项目' else 'current'))
+        topic['brief']['目标观众'] = '原有目标观众'
+        topic['editorial_project_id'] = '已有文案项目'
+        topic['transcript'] = '保留原逐字稿'
+        store.save(topic)
+    originals = {topic['id']: deepcopy(topic) for topic in store.topics()}
+    page = CreatorWorkbench(root=tmp_path)
+    page.resize(1100, 780)
+    page.show()
+    app.processEvents()
+    assert [page.production_tabs.tabText(i) for i in range(5)] == [
+        f'{i} {stage.title}' for i, stage in enumerate(STAGES, 1)
+    ]
+    assert page.tabs.tabText(1) == '选题判断'
+    assert page.tabs.tabText(2) == '视频拆解'
+    assert page.tabs.tabText(3) == '来源与逐字稿'
+    current_id = page.topic['id']
+    assert page.flush()
+    assert {topic['id']: topic for topic in store.topics()} == originals
+
+    page.production_tabs.setCurrentIndex(1)
+    script_tabs = page.production_tabs.currentWidget()
+    assert script_tabs.tabText(1) == '商单 Brief 五步'
+    script_tabs.setCurrentIndex(1)
+    brief = script_tabs.currentWidget()
+    assert brief.steps.count() == 5
+    for i, step in enumerate(COMMERCIAL.steps):
+        assert step.title in brief.steps.item(i).text()
+    brief.input.setPlainText('本机 Brief 原文')
+    brief.output.setPlainText('卖点｜第2页原句｜观众收益｜操作画面')
+    brief.complete.setChecked(True)
+    brief.steps.setCurrentRow(1)
+    brief.output.setPlainText('待筛思路')
+    page.production_tabs.setCurrentIndex(3)
+    post = page.production_tabs.currentWidget()
+    post.steps.setCurrentRow(2)
+    assert '相似快切' in post.guide.text()
+    post.output.setPlainText('参考片段 00:08–00:15')
+    page.list.setCurrentRow(1)
+    page.list.setCurrentRow(0)
+    assert page.topic['id'] == current_id
+    brief.steps.setCurrentRow(0)
+    assert brief.input.toPlainText() == '本机 Brief 原文'
+    assert brief.complete.isChecked()
+    page.close()
+
+    reopened = CreatorWorkbench(root=tmp_path)
+    records = reopened.topic['workflow']
+    assert records['brief-ideas']['output'] == '待筛思路'
+    assert records['post-visuals']['output'] == '参考片段 00:08–00:15'
+    plain = {k: value for k, value in reopened.topic.items() if k not in {'workflow', 'updated_at', 'revision'}}
+    original = {k: value for k, value in originals[current_id].items() if k not in {'updated_at', 'revision'}}
+    assert plain == original
+    assert '本机 Brief 原文' in core.topic_markdown(reopened.topic, include_workflow=True)
+    assert '本机 Brief 原文' not in core.topic_markdown(reopened.topic)
+    reopened.close()
 
 
 def test_status_filter_updates_after_edit_and_reflects_failed_save(app, tmp_path):
