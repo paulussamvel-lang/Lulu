@@ -1,9 +1,9 @@
 {
   "schema": 2,
   "version": "4.3.4",
-  "build": "20261124.1",
-  "product_release": "source-20261124.1",
-  "base_public_revision": "e8bf66c430444b1ccd2de3e6727e0c98794c9c32",
+  "build": "20261124.2",
+  "product_release": "source-20261124.2",
+  "base_public_revision": "7d33ac9b956fbf85a24307d00085e4e9e2e3aed4",
   "files": [
     {
       "path": ".gitignore",
@@ -14,7 +14,7 @@
     {
       "path": "BUILDING.md",
       "size": 5208,
-      "sha256": "900b66908e5ea4fce5d51b32bc3a9e3773ca85ce3535ee3575b16e73a053a5bb",
+      "sha256": "dce566b97e7de9bbdfd92a2ea0dbe69175be8a9f18f06bf00aaeb672f2439c2e",
       "mode": "100644"
     },
     {
@@ -31,8 +31,8 @@
     },
     {
       "path": "README.md",
-      "size": 6788,
-      "sha256": "5f38e0d97fef7fb3ec7964d721f26890e8ed4366182a8b7a0d139927eab55dc7",
+      "size": 7234,
+      "sha256": "b0d294adb007f191bf64a50b17d28be0d97be0812a3c5e3716e2d5cd2b2ef6b2",
       "mode": "100644"
     },
     {
@@ -151,8 +151,8 @@
     },
     {
       "path": "app/docs/features/creator-workbench.md",
-      "size": 3770,
-      "sha256": "4c0ec84f3a1335a8575d3083f5c5bf5419c9727fbfc76c79bb74338160dbfafb",
+      "size": 4609,
+      "sha256": "50748ef10c6aaa5a11fc4d1eb639f5844947936d0b17b0d33af588ad43b87cd5",
       "mode": "100644"
     },
     {
@@ -1290,6 +1290,12 @@
       "mode": "100644"
     },
     {
+      "path": "app/src/core/business_analysis.py",
+      "size": 6907,
+      "sha256": "95d807f22ac1357c2f78c8c89b0c44c586c770ee07ecc314f63639d6f79e0f32",
+      "mode": "100644"
+    },
+    {
       "path": "app/src/core/cli_runtime/__init__.py",
       "size": 479,
       "sha256": "27a897396f8045e915b3361101288424cacb8769d837e6fd2267335c0367d2b6",
@@ -1621,8 +1627,8 @@
     },
     {
       "path": "app/src/core/creator_workbench.py",
-      "size": 23813,
-      "sha256": "01d4aa09162b077cd884c9684c0f7529d6b33e7642104bada7fd25affbf4e1b7",
+      "size": 23979,
+      "sha256": "0ff458f13b5544f10ea28faebcbb6ebf1d94a462bd4eabf173e4c974585cac92",
       "mode": "100644"
     },
     {
@@ -3240,6 +3246,12 @@
       "mode": "100644"
     },
     {
+      "path": "app/src/ui/business_analysis.py",
+      "size": 16605,
+      "sha256": "fbe47a2f39b2f332cf0d8cff750c3f3bd2047fea7ee3309adc5f8cb0697f1262",
+      "mode": "100644"
+    },
+    {
       "path": "app/src/ui/candidate_comparison.py",
       "size": 7633,
       "sha256": "0e0e3ee0835b9e6a4aa1652bd4a1d656c1d7dcec16fad1ba5f19af7c9cb6533a",
@@ -3319,8 +3331,8 @@
     },
     {
       "path": "app/src/ui/creator_workbench.py",
-      "size": 51626,
-      "sha256": "4e3e06c536d52033549bc263efc096941cda380eee51d1a933a61f1f56e3b867",
+      "size": 55230,
+      "sha256": "ffd088a9b97346df03a6d47f0a236eedac5a0a4d2933bcdf349062e5eafdec5a",
       "mode": "100644"
     },
     {
@@ -3613,8 +3625,8 @@
     },
     {
       "path": "app/src/ui/main_window.py",
-      "size": 201484,
-      "sha256": "687908ccb282e07598c65cad6ce0e643ac7a0e2247457914fb8ced4e994d63e2",
+      "size": 201830,
+      "sha256": "78229b9274bd1f118cb9a3fa0f7a4b396066aa39b5a43e7b9993f649218640c8",
       "mode": "100644"
     },
     {
@@ -3938,7 +3950,7 @@
     {
       "path": "app/src/version.py",
       "size": 2988,
-      "sha256": "9460346df01fb71a6c16c1ad0f74a5439267c11f9a260dbb51f74b6e572b1d46",
+      "sha256": "9352f6af226b45fd1fbbc3c587182ea7ff8437f0a77c6e47a87aaa852642cb0b",
       "mode": "100644"
     },
     {
@@ -4357,8 +4369,8 @@
     },
     {
       "path": "app/tests/test_creator_workbench_ui.py",
-      "size": 9634,
-      "sha256": "891bf37133b24b99d99ba2b78e0fe082b5ecd978e1bf957ed89c0ad0f957af04",
+      "size": 14795,
+      "sha256": "cdb525aa9f98e962009e5d536d27ee8d8178dd5a56799480c2313545ed2e050d",
       "mode": "100644"
     },
     {

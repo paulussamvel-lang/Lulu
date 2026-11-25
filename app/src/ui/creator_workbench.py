@@ -110,6 +110,7 @@ class WorkflowPane(QWidget):
         super().__init__()
         self.stage = stage
         self.records = {}
+        self.business = None
         self.active_index = -1
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -193,7 +194,8 @@ class WorkflowPane(QWidget):
             item.setToolTip(label)
         self.progress.setText(f'{completed} / {len(self.stage.steps)} 步完成')
 
-    def load(self, records):
+    def load(self, records, business=None):
+        self.business = business
         self.records = {
             step.key: deepcopy(records[step.key])
             for step in self.stage.steps if isinstance(records.get(step.key), dict)
@@ -208,7 +210,11 @@ class WorkflowPane(QWidget):
         step = self.stage.steps[index]
         record = self.records.get(step.key, {})
         self.title.setText(step.title)
-        self.guide.setText(step.guidance)
+        guidance = step.guidance
+        if step.key == 'release-learn' and self.business:
+            guidance += (f'\n按相同观察窗口核对「{self.business["goal"]}」的假设。'
+                         '记录顾虑是否在评论或咨询中得到回答、有哪些证据，以及下一次怎么验证。')
+        self.guide.setText(guidance)
         self.result.setText(f'本步产物 · {step.artifact}')
         self.input.setPlaceholderText(step.input_hint)
         self.output.setPlaceholderText(step.output_hint)
@@ -425,7 +431,17 @@ class CreatorWorkbench(QWidget):
         self.count = QLabel(); ll.addWidget(self.count); split.addWidget(left)
         self.right = QWidget(); rr = QVBoxLayout(self.right); rr.setContentsMargins(6,0,0,0)
         self.empty = QLabel('从一个具体问题开始\n\n新建选题，或导入已有文件、页面和飞书资料。')
-        self.empty.setAlignment(Qt.AlignCenter); self.empty.setWordWrap(True); rr.addWidget(self.empty)
+        self.empty.setAlignment(Qt.AlignCenter); self.empty.setWordWrap(True)
+        self.empty_page = QWidget()
+        empty_layout = QVBoxLayout(self.empty_page)
+        empty_layout.addStretch()
+        empty_layout.addWidget(self.empty)
+        empty_layout.addWidget(button('展开商业分析', self.open_business), 0, Qt.AlignHCenter)
+        empty_layout.addStretch()
+        rr.addWidget(self.empty_page, 1)
+        self.business_open = False
+        from .business_analysis import BusinessAnalysisPane
+        self.business = BusinessAnalysisPane(self.store, self.close_business, self.open_business_draft)
         self.details = QWidget(); dl = QVBoxLayout(self.details); dl.setContentsMargins(0,0,0,0); rr.addWidget(self.details,1)
         self.title = field('选题名称', '给这个选题一个清楚的名称'); dl.addWidget(self.title)
         top = QHBoxLayout(); self.status = combo('当前选题状态', core.STATUSES)
@@ -443,7 +459,18 @@ class CreatorWorkbench(QWidget):
         topics, writing, shooting, editing, releasing, commercial = self.workflow_panes
         self.tabs = QTabWidget()
         self.tabs.setAccessibleName('选题和拆解资料')
-        self.tabs.addTab(topics, '流程与选题卡')
+        topics_page = QWidget()
+        topics_layout = QVBoxLayout(topics_page)
+        topics_layout.setContentsMargins(12, 10, 12, 0)
+        business_entry = QHBoxLayout()
+        business_entry.addWidget(button('展开商业分析', self.open_business))
+        self.business_summary = QLabel('适用于有明确产品、客户或增长目标的选题')
+        self.business_summary.setWordWrap(True)
+        self.business_summary.setTextFormat(Qt.PlainText)
+        business_entry.addWidget(self.business_summary, 1)
+        topics_layout.addLayout(business_entry)
+        topics_layout.addWidget(topics, 1)
+        self.tabs.addTab(topics_page, '流程与选题卡')
         self.build_brief(); self.build_analysis(); self.build_sources()
         script_tabs = QTabWidget()
         script_tabs.setAccessibleName('文案与商单流程')
@@ -451,6 +478,7 @@ class CreatorWorkbench(QWidget):
         script_tabs.addTab(commercial, COMMERCIAL.title)
         for index, (stage, page) in enumerate(zip(STAGES, (self.tabs, script_tabs, shooting, editing, releasing)), 1):
             self.production_tabs.addTab(page, f'{index} {stage.title}')
+        rr.addWidget(self.business, 1)
         split.addWidget(self.right); split.setSizes([250, 900]); split.setStretchFactor(1,1)
         self.notice = QLabel('资料保存在本机；网页读取与飞书导入仅在点击后进行。')
         self.notice.setWordWrap(True); layout.addWidget(self.notice)
@@ -701,9 +729,14 @@ class CreatorWorkbench(QWidget):
         self.loading = True
         self.topic = deepcopy(item.data(Qt.UserRole)) if item else None
         self.saved = deepcopy(self.topic)
-        self.details.setVisible(bool(self.topic)); self.empty.setVisible(not self.topic)
+        self.business.set_topic(self.topic)
+        self.show_work_area()
+        link = self.topic.get('business_analysis') if self.topic else None
+        self.business_summary.setText(
+            f'{link["snapshot"]["product"]} · {link["goal"]} · 版本 {link["card_revision"]}'
+            if link else '适用于有明确产品、客户或增长目标的选题')
         for pane in self.workflow_panes:
-            pane.load(self.topic.get('workflow', {}) if self.topic else {})
+            pane.load(self.topic.get('workflow', {}) if self.topic else {}, link)
         if self.topic:
             self.title.setText(self.topic['title']); self.tags.setText(self.topic['tags'])
             self.status.setCurrentText(self.topic['status']); self.decision.setPlainText(self.topic['decision'])
@@ -712,6 +745,45 @@ class CreatorWorkbench(QWidget):
             self.sources.setPlainText('\n\n'.join(s['title'] + '\n' + s['location'] + '\n' + s['text'] for s in self.topic['sources']))
             self.transcript.setPlainText(self.topic['transcript']); self.render_segments(); self.load_media()
         self.loading = False
+
+    def show_work_area(self):
+        self.details.setVisible(bool(self.topic) and not self.business_open)
+        self.empty_page.setVisible(not self.topic and not self.business_open)
+        self.business.setVisible(self.business_open)
+
+    def open_business(self):
+        if self.flush():
+            self.business.open()
+            self.business_open = True
+            self.show_work_area()
+
+    def close_business(self):
+        self.business_open = False
+        self.show_work_area()
+
+    def open_business_draft(self, card):
+        if not self.flush():
+            return
+        from .business_analysis import BusinessDraftDialog
+        draft = BusinessDraftDialog(card, deepcopy(self.topic), self.save_business_draft, self)
+        if draft.exec() == QDialog.Accepted:
+            self.business.notice.setText('选题已保存，已关联采用时的产品卡版本。')
+
+    def save_business_draft(self, topic, title, card, goal, fields, selected, evidence):
+        from ..core import business_analysis as ba
+        creating = topic is None
+        updated = ba.adopt_draft(core.new_topic(title) if creating else topic, card, goal, fields, selected, evidence)
+        self.store.save(updated)
+        if creating or not self.matches_filter(updated, self.search.text().strip().casefold()):
+            with QSignalBlocker(self.filter), QSignalBlocker(self.search):
+                self.filter.setCurrentIndex(0)
+                self.filter.setToolTip(self.filter.currentText())
+                self.search.clear()
+        self.refresh_list()
+        for row in range(self.list.count()):
+            if self.list.item(row).data(Qt.UserRole)['id'] == updated['id']:
+                self.list.setCurrentRow(row)
+                break
 
     def new_topic(self):
         if not self.flush(): return

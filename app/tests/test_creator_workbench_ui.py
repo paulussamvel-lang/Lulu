@@ -205,3 +205,113 @@ def test_native_dark_system_palette_does_not_darken_creator_dialogs(app,tmp_path
         for dialog in dialogs:dialog.close()
         page.close()
     finally:app.setPalette(before)
+
+
+def test_business_card_from_workbench_keeps_evidence_and_existing_topic(app, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QDialog, QPushButton
+    from src.ui.business_analysis import BusinessDraftDialog
+
+    store = core.CreatorStore(tmp_path)
+    original = core.new_topic('旧项目')
+    original['brief']['目标观众'] = '原来就填好了的观众'
+    original['brief']['具体痛点'] = '原来就填好的痛点'
+    original['analysis'][core.DIMENSIONS[0]] = '对标拆解原文'
+    original['workflow'] = {COMMERCIAL.steps[0].key: {'input': '原 Brief', 'done': True}}
+    store.save(original)
+    page = CreatorWorkbench(root=tmp_path)
+    page.resize(1100, 780)
+    page.show()
+    app.processEvents()
+    entry = next(button for button in page.findChildren(QPushButton)
+                 if button.text() == '展开商业分析' and button.isVisible())
+    QTest.mouseClick(entry, Qt.LeftButton)
+    business = page.business
+    assert business.isVisible()
+    assert not business.details.isVisible()
+
+    business.inputs['product'].setText('测试二手车')
+    business.inputs['payer'].setText('预算已定的首次购车者')
+    business.inputs['scene'].setText('试驾后准备交订金')
+    business.inputs['concern'].setText('怎么确认车况？')
+    QTest.mouseClick(business.details_button, Qt.LeftButton)
+    business.bottleneck.setCurrentText('交付')
+    business.inputs['verification'].setText('核对检测文件和现场车辆一致')
+    business.add_evidence({})
+    row = business.rows[0]
+    row.note.setText('镜头拍检测记录和现场车身编号')
+    row.status.setCurrentText('已核实')
+    QTest.mouseClick(business.save_button, Qt.LeftButton)
+    assert '需要同时填写' in business.notice.text()
+    assert not business.store.cards()
+    row.source.setText('测试车辆检测单第2页')
+    QTest.mouseClick(business.save_button, Qt.LeftButton)
+    saved_card = deepcopy(business.card)
+    assert saved_card['revision'] == 1
+    assert store.topics() == [original]
+    page.close()
+
+    page = CreatorWorkbench(root=tmp_path)
+    page.resize(1100, 780)
+    page.show()
+    page.open_business()
+    business = page.business
+    business.library.setCurrentIndex(1)
+    assert business.card == saved_card
+
+    def cancel_draft(dialog):
+        dialog.goal.setCurrentText('被认可')
+        assert '测试车辆检测单第2页' in dialog.fields['proof'].toPlainText()
+        dialog.proof.setCurrentIndex(0)
+        assert '待补证据' in dialog.fields['proof'].toPlainText()
+        assert not dialog.checks['audience'].isChecked()
+        assert not dialog.checks['scene'].isChecked()
+        assert not dialog.checks['question'].isChecked()
+        dialog.reject()
+        return dialog.result()
+
+    monkeypatch.setattr(BusinessDraftDialog, 'exec', cancel_draft)
+    QTest.mouseClick(business.draft_button, Qt.LeftButton)
+    assert store.topics() == [original]
+
+    def save_draft(dialog):
+        dialog.goal.setCurrentText('被认可')
+        dialog.proof.setCurrentIndex(1)
+        assert '测试车辆检测单第2页' in dialog.fields['proof'].toPlainText()
+        dialog.fields['benefit'].setPlainText('学会核对检测单与现场车辆')
+        dialog.save_topic()
+        assert dialog.result() == QDialog.Accepted
+        return dialog.result()
+
+    monkeypatch.setattr(BusinessDraftDialog, 'exec', save_draft)
+    QTest.mouseClick(business.draft_button, Qt.LeftButton)
+    saved = store.topics()[0]
+    assert saved['brief']['目标观众'] == original['brief']['目标观众']
+    assert saved['brief']['具体痛点'] == original['brief']['具体痛点']
+    assert saved['brief']['观众收获'] == '学会核对检测单与现场车辆'
+    assert saved['analysis'] == original['analysis']
+    assert saved['workflow'] == original['workflow']
+    assert saved['business_analysis']['snapshot'] == saved_card
+    assert saved['business_analysis']['evidence']['source'] == '测试车辆检测单第2页'
+    assert business.version_button.isVisible()
+    release = page.workflow_panes[4]
+    release.steps.setCurrentRow(next(i for i, step in enumerate(release.stage.steps) if step.key == 'release-learn'))
+    assert '「被认可」' in release.guide.text()
+
+    def save_new_draft(dialog):
+        dialog.destination.setCurrentIndex(1)
+        dialog.title.setText('更换一个题目复用同一张卡')
+        dialog.goal.setCurrentText('被需要')
+        dialog.proof.setCurrentIndex(0)
+        dialog.save_topic()
+        return dialog.result()
+
+    monkeypatch.setattr(BusinessDraftDialog, 'exec', save_new_draft)
+    QTest.mouseClick(business.draft_button, Qt.LeftButton)
+    second, first = store.topics()
+    assert second['business_analysis']['card_id'] == first['business_analysis']['card_id']
+    assert second['brief']['证据与待核实'].startswith('待补证据')
+    business.inputs['concern'].setText('更新后，过去的题目仍可回查')
+    QTest.mouseClick(business.save_button, Qt.LeftButton)
+    assert business.card['revision'] == 2
+    assert store.topics()[1]['business_analysis']['snapshot'] == saved_card
+    page.close()

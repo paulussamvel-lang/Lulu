@@ -394,6 +394,9 @@ def topic_markdown(topic, *, include_workflow=False):
     if topic['transcript'].strip(): lines += ['', '## 参考逐字稿', topic['transcript']]
     if include_workflow:
         from .creator_workflow import workflow_markdown
+        if topic.get('business_analysis'):
+            from .business_analysis import export_lines
+            lines.extend(export_lines(topic['business_analysis']))
         lines.extend(workflow_markdown(topic.get('workflow', {})))
     return '\n'.join(lines)
 

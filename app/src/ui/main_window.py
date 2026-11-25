@@ -4149,6 +4149,9 @@ class MainWindow(QWidget):
         return not any(running(worker) for worker in workers)
 
     def has_unsaved_work(self) -> bool:
+        creator = getattr(self, 'creator_page', None)
+        if creator is not None and creator.business.dirty():
+            return True
         if getattr(self.library_page, "dirty", False):
             return True
         if any(has_unsaved_result(t) for t in self.tasks):
@@ -4211,6 +4214,10 @@ class MainWindow(QWidget):
     def closeEvent(self, e):  # noqa: N802
         creator = getattr(self, 'creator_page', None)
         if creator is not None:
+            if creator.business.dirty():
+                self._toast('商业分析中有未保存的产品卡。请先保存或撤回，然后再退出。')
+                e.ignore()
+                return
             if creator.is_busy() or not creator.flush():
                 self._toast('选题资料仍在读取，或尚未保存。请处理页面提示后再退出。')
                 e.ignore()
