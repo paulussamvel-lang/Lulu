@@ -386,6 +386,8 @@ def topic_markdown(topic, *, include_workflow=False):
     lines += ['## 来源']
     for source in topic['sources']:
         lines += [f'- {source["title"]}：{source["location"]}']
+        if include_workflow and topic.get('planning_context') and source['title'] == '账号定位的对标片段':
+            lines.append(source['text'])
     for key in DIMENSIONS:
         lines += ['', f'## {key}', topic['analysis'].get(key, '') or '待拆解']
     for segment in sorted(topic['segments'], key=lambda s: s['start_ms']):
@@ -394,6 +396,9 @@ def topic_markdown(topic, *, include_workflow=False):
     if topic['transcript'].strip(): lines += ['', '## 参考逐字稿', topic['transcript']]
     if include_workflow:
         from .creator_workflow import workflow_markdown
+        if topic.get('planning_context'):
+            plan = topic['planning_context']
+            lines.extend(('', '## 账号定位来源', f'{plan["track"]} · 第 {plan["revision"]} 版'))
         if topic.get('business_analysis'):
             from .business_analysis import export_lines
             lines.extend(export_lines(topic['business_analysis']))

@@ -27,7 +27,7 @@ from PySide6.QtCore import (
     Signal,
 )
 from PySide6.QtGui import QGuiApplication, QIcon
-from PySide6.QtWidgets import QAbstractButton, QAbstractItemView, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QPushButton, QApplication, QScrollBar, QSizePolicy, QSlider, QSpinBox, QStackedWidget, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QAbstractButton, QAbstractItemView, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QPushButton, QApplication, QScrollArea, QScrollBar, QSizePolicy, QSlider, QSpinBox, QStackedWidget, QTextEdit, QVBoxLayout, QWidget
 
 from ..config import AppConfig
 from ..core.task import Task, TaskExecutionPolicy, TaskGroup, TaskGroupCandidate, TaskGroupMember, TaskState, derive_collection_item_runtime, task_display_title
@@ -871,11 +871,24 @@ class MainWindow(QWidget):
         self._queue_count_label = None
         self._library_count_labels = {}
         self._page_navs: list = []
-        lay.addWidget(self._nav_label("工作台"))
+        lay.addWidget(self._nav_label("创作流程"))
         from .workbench_navigation import WorkbenchNavigation
         self.workbench_navigation = WorkbenchNavigation(self.workbench_consumer_theme)
-        for ico, text, index in (("workspace_grid", "视频制作", CREATOR_WORKBENCH_PAGE),
-                                 ("file", "文案精选", CONTENT_WORKBENCH_PAGE),
+        for ico, text, section in (("search", "候选赛道", "track"),
+                                   ("dashboard", "商业分析", "business"),
+                                   ("user", "账号定位", "position"),
+                                   ("workspace_grid", "对标与选题", "workflow"),
+                                   ("pen", "文案", "script"),
+                                   ("video", "拍摄", "shoot"),
+                                   ("layers", "后期", "post"),
+                                   ("export", "发布与复盘", "publish"),
+                                   ("list", "商单 Brief 拆解", "brief")):
+            if section in {"workflow", "brief"}:
+                self.workbench_navigation.layout().addWidget(
+                    self._nav_label("视频制作" if section == "workflow" else "制作工具"))
+            row = self._page_nav(ico, text, CREATOR_WORKBENCH_PAGE, creator_section=section)
+            self.workbench_navigation.add_row((CREATOR_WORKBENCH_PAGE, section), row)
+        for ico, text, index in (("file", "文案精选", CONTENT_WORKBENCH_PAGE),
                                  ("headphones", "内容提取", 0), ("workspace_grid", "主页采集", 5),
                                  ("mic", "文案配音", 4), ("video", "直播录制", LIVE_RECORDING_PAGE)):
             self.workbench_navigation.add_row(index, self._page_nav(ico, text, index, live_count=0 if index == 0 else None))
@@ -883,8 +896,13 @@ class MainWindow(QWidget):
         for ico, text, kind in (("workspace_doc", "文稿库", "transcript"),
                                 ("waveform", "音频库", "voice"), ("trash", "归档", "trash")):
             self.workbench_navigation.add_row(('library', kind), self._library_nav(ico, text, kind))
-        lay.addWidget(self.workbench_navigation)
-        lay.addStretch(1)
+        self.workbench_navigation.layout().addStretch(1)
+        navigation_scroll = QScrollArea()
+        navigation_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        navigation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        navigation_scroll.setWidgetResizable(True)
+        navigation_scroll.setWidget(self.workbench_navigation)
+        lay.addWidget(navigation_scroll, 1)
         lay.addWidget(self._nav_label("配置与连接"))
         lay.addWidget(self._page_nav("ai_cube", "AI 大模型", 1))
         lay.addWidget(self._nav_item("layers", "Obsidian 知识库",
@@ -1047,15 +1065,17 @@ class MainWindow(QWidget):
                 self._open_update_settings()
 
     # ---------------- 切页导航 ---------------- #
-    def _page_nav(self, ico: str, text: str, index: int, live_count: int | None = None) -> QFrame:
+    def _page_nav(self, ico: str, text: str, index: int, live_count: int | None = None,
+                  *, creator_section: str | None = None) -> QFrame:
         row = QFrame()
+        # Keep the eight phase destinations within the short-window viewport.
         # Selected bold text and focus borders must not move subsequent rows.
-        row.setFixedHeight(40)
+        row.setFixedHeight(36 if creator_section is not None else 40)
         row.setObjectName("navItem")
         adopt_nav_row(
             row,
             accessible_name=f"导航：{text}",
-            on_activate=lambda i=index: self._switch_page(i),
+            on_activate=lambda: self._switch_page(index, creator_section=creator_section),
         )
         h = QHBoxLayout(row)
         h.setContentsMargins(12, 9, 10, 9)
@@ -1079,7 +1099,7 @@ class MainWindow(QWidget):
             self._queue_count_label = ct
             self._queue_count_chip = chip
             chip.setVisible(live_count > 0)
-        self._page_navs.append((index, None, row, iconlab, lab, ico))
+        self._page_navs.append((index, creator_section, row, iconlab, lab, ico))
         return row
 
     def _library_nav(self, ico: str, text: str, kind: str) -> QFrame:
@@ -1130,7 +1150,8 @@ class MainWindow(QWidget):
         # Do not refresh a hidden dubbing workbench inside the settings click.
         QTimer.singleShot(0, self, lambda: workspace.publish(force=True))
 
-    def _switch_page(self, index: int, *, library_kind: str | None = None) -> None:
+    def _switch_page(self, index: int, *, library_kind: str | None = None,
+                     creator_section: str | None = None) -> None:
         if index in {3, 7}:  # Retired text workbenches now lead to the manuscript library.
             index = 2
             library_kind = "transcript"
@@ -1142,7 +1163,9 @@ class MainWindow(QWidget):
         if creator is not None and not creator.flush():
             return
         # Selection responds before a first-use page constructs its controls.
-        self._sync_page_navigation(target_index=index, target_kind=library_kind)
+        if index == CREATOR_WORKBENCH_PAGE:
+            creator_section = creator_section or "workflow"
+        self._sync_page_navigation(target_index=index, target_kind=creator_section or library_kind)
         self._ensure_page_loaded(index)
         self.stack.setCurrentIndex(index)
         self._sync_workbench_paper_scope(index)
@@ -1159,6 +1182,7 @@ class MainWindow(QWidget):
                 self.library_page.refresh()
         elif index == CREATOR_WORKBENCH_PAGE:
             self.creator_page.refresh_list()
+            self.creator_page.open_section(creator_section)
         elif index == 4:
             QTimer.singleShot(0, self, lambda: self.voice_page.refresh() if self.stack.currentIndex() == 4 else None)
         elif index == 5:
@@ -1171,6 +1195,8 @@ class MainWindow(QWidget):
         current_kind = target_kind or (getattr(self.library_page, "_kind", "all") if self.library_page is not None else "all")
         if index == 6:
             current_kind = getattr(self.settings_page, "current_category", "general")
+        elif index == CREATOR_WORKBENCH_PAGE:
+            current_kind = target_kind or self.creator_page.navigation_section()
         for idx, kind, row, iconlab, lab, ico in self._page_navs:
             active = (idx == index and (kind is None or kind == current_kind)) or (idx == 1 and index == 2 and current_kind == "models")
             if row.property("consumerAccent") == active and row.property("selected") == active:
@@ -1194,7 +1220,8 @@ class MainWindow(QWidget):
             for w in (row, lab):
                 style.unpolish(w)
                 style.polish(w)
-        self.workbench_navigation.select(('library', current_kind) if index == 2 else index)
+        key = {2: 'library', CREATOR_WORKBENCH_PAGE: CREATOR_WORKBENCH_PAGE}.get(index)
+        self.workbench_navigation.select((key, current_kind) if key is not None else index)
         self._sync_toggle_icons()
 
     def _sync_workbench_paper_scope(self, index: int | None = None) -> None:
@@ -1293,6 +1320,9 @@ class MainWindow(QWidget):
         except (OSError, ValueError, RuntimeError) as exc:
             page.error(str(exc))
 
+    def _open_creator_tool(self, name):
+        self._switch_page({'extraction': 0, 'collection': 5, 'voice': 4, 'live': LIVE_RECORDING_PAGE}[name])
+
     def _open_creator_extraction(self, source):
         self._switch_page(0)
         if source:
@@ -1353,6 +1383,8 @@ class MainWindow(QWidget):
             widget.editorial_requested.connect(self._open_creator_editorial)
             widget.extraction_requested.connect(self._open_creator_extraction)
             widget.configure_feishu.connect(self._config_feishu)
+            widget.navigation_changed.connect(self._sync_page_navigation)
+            widget.tool_requested.connect(self._open_creator_tool)
             self.creator_page = widget
         elif index == CONTENT_WORKBENCH_PAGE:
             from .content_workbench import ContentWorkbench
@@ -4150,7 +4182,7 @@ class MainWindow(QWidget):
 
     def has_unsaved_work(self) -> bool:
         creator = getattr(self, 'creator_page', None)
-        if creator is not None and creator.business.dirty():
+        if creator is not None and (creator.business.dirty() or creator.planning.dirty()):
             return True
         if getattr(self.library_page, "dirty", False):
             return True
@@ -4214,6 +4246,10 @@ class MainWindow(QWidget):
     def closeEvent(self, e):  # noqa: N802
         creator = getattr(self, 'creator_page', None)
         if creator is not None:
+            if creator.planning.dirty():
+                self._toast('候选赛道或账号定位有未保存的调研。请先保存或撤回，再退出。')
+                e.ignore()
+                return
             if creator.business.dirty():
                 self._toast('商业分析中有未保存的产品卡。请先保存或撤回，然后再退出。')
                 e.ignore()

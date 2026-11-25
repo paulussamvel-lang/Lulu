@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import creator_workbench as core
+from ..core.creator_planning import PRODUCTION_SECTIONS
 from ..core.creator_status_sync import SYNC_INTERVAL_MS, TopicStatusSync
 from ..core.creator_workflow import COMMERCIAL, STAGES
 from . import theme as T
@@ -380,6 +381,8 @@ class CreatorWorkbench(QWidget):
     editorial_requested = Signal(str)
     extraction_requested = Signal(str)
     configure_feishu = Signal()
+    navigation_changed = Signal()
+    tool_requested = Signal(str)
 
     def __init__(self, parent=None, *, root=None):
         super().__init__(parent)
@@ -409,16 +412,27 @@ class CreatorWorkbench(QWidget):
         self.list_refresh.timeout.connect(self.refresh_list)
         self.applied_filter = (0, '')
         layout = QVBoxLayout(self); layout.setContentsMargins(26, 20, 26, 22); layout.setSpacing(12)
-        header, _, _ = build_consumer_page_header('视频制作工作台', '选定左侧项目，记录每个阶段的步骤与产物。')
+        header, self.page_heading, self.page_subtitle = build_consumer_page_header(
+            '视频制作工作台', '选定左侧项目，记录每个阶段的步骤与产物。')
         layout.addWidget(header)
-        intake = QHBoxLayout()
+        self.intake_bar = QWidget()
+        intake = QHBoxLayout(self.intake_bar)
+        intake.setContentsMargins(0, 0, 0, 0)
         intake.addWidget(button('新建选题', self.new_topic, True))
-        intake.addWidget(button('导入本地文件', self.import_local))
-        intake.addWidget(button('导入网页 / 飞书', self.import_url))
-        intake.addWidget(button('导出当前记录', self.export_topic)); intake.addStretch()
-        intake.addWidget(button('同步飞书状态', self.request_status_sync))
-        self.intake_row = intake; layout.addLayout(intake)
-        split = QSplitter(Qt.Horizontal); split.setChildrenCollapsible(False); layout.addWidget(split, 1)
+        local_import = button('导入本地文件', self.import_local)
+        web_import = button('导入网页 / 飞书', self.import_url)
+        sync = button('同步飞书状态', self.request_status_sync)
+        self.intake_tools = (local_import, web_import, sync)
+        intake.addWidget(local_import)
+        intake.addWidget(web_import)
+        intake.addWidget(button('导出当前记录', self.export_topic))
+        intake.addStretch()
+        intake.addWidget(sync)
+        self.intake_row = intake
+        layout.addWidget(self.intake_bar)
+        split = self.topic_area = QSplitter(Qt.Horizontal)
+        split.setChildrenCollapsible(False)
+        layout.addWidget(split, 1)
         left = QWidget(); left.setMinimumWidth(210); ll = QVBoxLayout(left); ll.setContentsMargins(0,0,6,0)
         self.search = field('搜索选题', '搜索标题、标签、来源和内容')
         self.search.textChanged.connect(self.refresh_list); ll.addWidget(self.search)
@@ -436,20 +450,40 @@ class CreatorWorkbench(QWidget):
         empty_layout = QVBoxLayout(self.empty_page)
         empty_layout.addStretch()
         empty_layout.addWidget(self.empty)
-        empty_layout.addWidget(button('展开商业分析', self.open_business), 0, Qt.AlignHCenter)
+        self.empty_brief = QLabel('要拆解商单 Brief，请在左侧选一条选题，或新建选题。')
+        self.empty_brief.setAlignment(Qt.AlignCenter)
+        self.empty_brief.setWordWrap(True)
+        empty_layout.addWidget(self.empty_brief)
+        self.empty_business_button = button('展开商业分析', self.open_business)
+        empty_layout.addWidget(self.empty_business_button, 0, Qt.AlignHCenter)
         empty_layout.addStretch()
         rr.addWidget(self.empty_page, 1)
         self.business_open = False
+        self.planning_section = ''
         from .business_analysis import BusinessAnalysisPane
-        self.business = BusinessAnalysisPane(self.store, self.close_business, self.open_business_draft)
+        from .creator_planning import PlanningPane
+        self.business = BusinessAnalysisPane(
+            self.store, self.close_business, self.open_business_draft,
+            next_stage=lambda: self.open_section('position'))
+        self.planning = PlanningPane(
+            self.store, self.business.store, self.open_section, self.preview_planned_topic, self.tool_requested.emit)
+        layout.addWidget(self.planning, 1)
         self.details = QWidget(); dl = QVBoxLayout(self.details); dl.setContentsMargins(0,0,0,0); rr.addWidget(self.details,1)
         self.title = field('选题名称', '给这个选题一个清楚的名称'); dl.addWidget(self.title)
+        plan_row = QHBoxLayout()
+        self.plan_label = QLabel()
+        self.plan_label.setTextFormat(Qt.PlainText)
+        self.plan_label.setWordWrap(True)
+        plan_row.addWidget(self.plan_label, 1)
+        self.plan_button = button('查看账号定位', self.open_topic_plan)
+        plan_row.addWidget(self.plan_button)
+        dl.addLayout(plan_row)
         top = QHBoxLayout(); self.status = combo('当前选题状态', core.STATUSES)
         status_label = QLabel('当前选题状态'); status_label.setBuddy(self.status)
         self.tags = field('选题标签', '标签，例如：工具实测、效率、入门')
         top.addWidget(status_label)
         top.addWidget(self.status); top.addWidget(self.tags,1)
-        top.addWidget(button('进入文案精选 →', self.open_editorial, True)); dl.addLayout(top)
+        dl.addLayout(top)
         self.production_tabs = QTabWidget()
         self.production_tabs.setAccessibleName('视频制作阶段')
         dl.addWidget(self.production_tabs, 1)
@@ -472,13 +506,31 @@ class CreatorWorkbench(QWidget):
         topics_layout.addWidget(topics, 1)
         self.tabs.addTab(topics_page, '流程与选题卡')
         self.build_brief(); self.build_analysis(); self.build_sources()
-        script_tabs = QTabWidget()
-        script_tabs.setAccessibleName('文案与商单流程')
-        script_tabs.addTab(writing, '通用文案')
-        script_tabs.addTab(commercial, COMMERCIAL.title)
-        for index, (stage, page) in enumerate(zip(STAGES, (self.tabs, script_tabs, shooting, editing, releasing)), 1):
+        self.script_tabs = QTabWidget()
+        self.script_tabs.setAccessibleName('文案与商单流程')
+        self.script_tabs.addTab(writing, '通用文案')
+        self.script_tabs.addTab(commercial, COMMERCIAL.title)
+        for index, (stage, page) in enumerate(zip(STAGES, (self.tabs, self.script_tabs, shooting, editing, releasing)), 1):
             self.production_tabs.addTab(page, f'{index} {stage.title}')
         rr.addWidget(self.business, 1)
+        self.phase_tools = QWidget()
+        tools = QHBoxLayout(self.phase_tools)
+        tools.setContentsMargins(0, 0, 0, 0)
+        self.phase_tool_buttons = {}
+        for name, label, action in (
+            ('collection', '主页采集', lambda: self.tool_requested.emit('collection')),
+            ('extraction', '下载与转录', lambda: self.tool_requested.emit('extraction')),
+            ('editorial', '文案精选', self.open_editorial),
+            ('voice', '文案配音', lambda: self.tool_requested.emit('voice')),
+            ('record_audio', '录音工作区', lambda: self.tool_requested.emit('extraction')),
+            ('live', '直播录制', lambda: self.tool_requested.emit('live')),
+        ):
+            self.phase_tool_buttons[name] = button(label, action)
+            tools.addWidget(self.phase_tool_buttons[name])
+        self.phase_handoff = QLabel()
+        self.phase_handoff.setWordWrap(True)
+        tools.addWidget(self.phase_handoff, 1)
+        dl.addWidget(self.phase_tools)
         split.addWidget(self.right); split.setSizes([250, 900]); split.setStretchFactor(1,1)
         self.notice = QLabel('资料保存在本机；网页读取与飞书导入仅在点击后进行。')
         self.notice.setWordWrap(True); layout.addWidget(self.notice)
@@ -489,7 +541,10 @@ class CreatorWorkbench(QWidget):
         for item in (self.title, self.tags): item.textEdited.connect(self.changed)
         self.status.currentIndexChanged.connect(self.changed)
         self.status.activated.connect(self.apply_topic_status)
+        self.production_tabs.currentChanged.connect(self.update_navigation)
+        self.script_tabs.currentChanged.connect(self.update_navigation)
         self.refresh_list()
+        self.update_navigation()
 
     def build_brief(self):
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QScrollArea.NoFrame)
@@ -738,6 +793,11 @@ class CreatorWorkbench(QWidget):
         for pane in self.workflow_panes:
             pane.load(self.topic.get('workflow', {}) if self.topic else {}, link)
         if self.topic:
+            plan = self.topic.get('planning_context')
+            if plan:
+                self.plan_label.setText(f'来自「{plan["track"]}」第 {plan["revision"]} 版')
+            self.plan_label.setVisible(bool(plan))
+            self.plan_button.setVisible(bool(plan))
             self.title.setText(self.topic['title']); self.tags.setText(self.topic['tags'])
             self.status.setCurrentText(self.topic['status']); self.decision.setPlainText(self.topic['decision'])
             for k,w in self.brief.items(): w.setPlainText(self.topic['brief'].get(k,''))
@@ -747,19 +807,129 @@ class CreatorWorkbench(QWidget):
         self.loading = False
 
     def show_work_area(self):
+        planning = bool(self.planning_section)
+        self.intake_bar.setVisible(not planning)
+        self.topic_area.setVisible(not planning)
+        self.planning.setVisible(planning)
+        self.notice.setVisible(not planning)
+        self.sync_notice.setVisible(not planning and bool(self.status_sync_url))
         self.details.setVisible(bool(self.topic) and not self.business_open)
         self.empty_page.setVisible(not self.topic and not self.business_open)
         self.business.setVisible(self.business_open)
 
-    def open_business(self):
+    def navigation_section(self):
+        if self.planning_section:
+            return self.planning_section
+        if self.business_open:
+            return 'business'
+        if (self.production_tabs.currentWidget() is self.script_tabs
+                and self.script_tabs.currentWidget() is self.workflow_panes[-1]):
+            return 'brief'
+        return PRODUCTION_SECTIONS[max(self.production_tabs.currentIndex(), 0)]
+
+    def update_navigation(self, *_):
+        section = self.navigation_section()
+        briefing = section == 'brief'
+        headings = {
+            'track': ('候选赛道', '记录具体人群、真实问题、你能提供的帮助和需求依据。'),
+            'business': ('商业分析', '查主流产品、成交与交付链路、实际付款者和购买顾虑。'),
+            'position': ('账号定位', '用内容调研确定账号方向，按购买进程安排第一批内容。'),
+            'brief': ('商单 Brief 拆解', COMMERCIAL.artifact),
+        }
+        if section in headings:
+            title, subtitle = headings[section]
+        else:
+            phase = STAGES[PRODUCTION_SECTIONS.index(section)]
+            title, subtitle = ('文案' if section == 'script' else phase.title), phase.artifact
+        self.page_heading.setText(title)
+        self.page_heading.setAccessibleName(title)
+        self.page_subtitle.setText(subtitle)
+        for widget in self.intake_tools:
+            widget.setVisible(section == 'workflow')
+        aids = {
+            'workflow': (('collection', 'extraction'), '待接入 · 跨平台对标与评论采集。记录来源和片段时间码。'),
+            'script': (('editorial', 'voice'), '待接入 · 外部文案协作。交接口播、画面与必拍镜头。'),
+            'brief': (('editorial',), '待接入 · 外部 Brief 协作。交接原文依据与交付时间。'),
+            'shoot': (('record_audio', 'live'), '待接入 · 相机与录屏工具。交接口播、录屏、实拍和备份。'),
+            'post': (('extraction', 'voice'), '待接入 · 剪辑、字幕与混音工具。交接可播放预览和返修时间码。'),
+            'publish': ((), '待接入 · 封面、发布与平台数据。记录实际链接、版本和一致的观察窗口。'),
+        }
+        tools, handoff = aids.get(section, ((), ''))
+        for name, widget in self.phase_tool_buttons.items():
+            widget.setVisible(name in tools)
+        self.phase_handoff.setText(handoff)
+        self.empty.setVisible(not briefing)
+        self.empty_brief.setVisible(briefing)
+        self.empty_business_button.setVisible(not briefing)
+        self.navigation_changed.emit()
+
+    def open_section(self, section):
+        if not self.flush():
+            return
+        self.planning_section = section if section in ('track', 'position') else ''
+        if section == 'business':
+            self.open_business(self.planning.read()['business_card_id'])
+            return
+        self.business_open = False
+        if self.planning_section:
+            self.planning.set_section(self.planning_section)
+        else:
+            production = 'script' if section == 'brief' else section
+            with QSignalBlocker(self.production_tabs), QSignalBlocker(self.script_tabs):
+                self.production_tabs.setCurrentIndex(PRODUCTION_SECTIONS.index(production))
+                if production == 'script':
+                    self.script_tabs.setCurrentIndex(int(section == 'brief'))
+        self.show_work_area()
+        self.update_navigation()
+
+    def open_business(self, preferred_card=''):
         if self.flush():
-            self.business.open()
+            self.planning_section = ''
+            self.business.open(preferred_card)
             self.business_open = True
             self.show_work_area()
+            self.update_navigation()
+
+    def open_topic_plan(self):
+        plan_id = self.topic['planning_context']['id']
+        if self.planning.dirty() and self.planning.plan['id'] != plan_id:
+            self.error('先保存或撤回当前的调研修改，再打开这条选题的账号定位。')
+            return
+        if not self.planning.dirty():
+            plans = {record['id']: record for record in self.planning.store.plans()}
+            if plan_id not in plans:
+                self.error('原账号定位记录不可用，这条选题仍保留了带入的字段和出处。')
+                return
+            self.planning.load(plans[plan_id])
+        self.open_section('position')
+
+    def preview_planned_topic(self, plan):
+        from .creator_planning import PlanningDraftDialog
+
+        def commit(topic):
+            self.store.save(topic)
+            self.reveal_topic(topic['id'])
+            self.open_section('workflow')
+            self.tabs.setCurrentIndex(1)
+            self.error('已创建选题卡，可以开始找对标与验证。')
+
+        PlanningDraftDialog(plan, commit, self).exec()
+
+    def reveal_topic(self, topic_id):
+        with QSignalBlocker(self.filter), QSignalBlocker(self.search):
+            self.filter.setCurrentIndex(0)
+            self.filter.setToolTip(self.filter.currentText())
+            self.search.clear()
+        self.refresh_list()
+        for row in range(self.list.count()):
+            if self.list.item(row).data(Qt.UserRole)['id'] == topic_id:
+                self.list.setCurrentRow(row)
+                break
 
     def close_business(self):
         self.business_open = False
         self.show_work_area()
+        self.update_navigation()
 
     def open_business_draft(self, card):
         if not self.flush():

@@ -13,6 +13,7 @@ PRODUCT_FIELDS = (
     ('concern', '购买顾虑', '客户在比较或付款前问过什么？'),
 )
 DETAIL_FIELDS = (
+    ('market', '主流产品或服务', '记录同品类商家在卖什么、做到哪一步及相关来源。'),
     ('purchase', '营销与销售', '客户在哪里认识、咨询、比较并下单？'),
     ('delivery', '交付', '客户买完收到什么？如何交付？'),
     ('bottleneck_note', '主要卡点', '哪件事最影响结果？依据是什么？'),
@@ -129,10 +130,10 @@ def export_lines(link):
     lines = ['', '## 商业分析', f'{card["product"]} · 版本 {link["card_revision"]}',
              f'选题主任务：{link["goal"]}']
     for key, label, _ in (*PRODUCT_FIELDS, *DETAIL_FIELDS):
-        if card[key]:
+        if card.get(key):
             lines.append(f'{label}：{card[key]}')
     for key, label in (('bottleneck', '卡点所在环节'), ('motive', '消费动机')):
-        if card[key]:
+        if card.get(key):
             lines.append(f'{label}：{card[key]}')
     lines.extend(('', '### 本条草稿参考的证据', evidence_text(link.get('evidence'))))
     if card['evidence']:

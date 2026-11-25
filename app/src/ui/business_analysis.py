@@ -51,7 +51,7 @@ class EvidenceRow(QWidget):
 
 
 class BusinessAnalysisPane(QWidget):
-    def __init__(self, store, close, open_draft):
+    def __init__(self, store, close, open_draft, *, next_stage):
         super().__init__()
         self.store = ba.BusinessStore(store)
         self.open_draft = open_draft
@@ -97,11 +97,11 @@ class BusinessAnalysisPane(QWidget):
         self.bottleneck = combo('卡点所在环节', ba.BOTTLENECKS)
         self.bottleneck.currentIndexChanged.connect(self.changed)
         delivery.addRow('卡点所在环节', self.bottleneck)
-        self.add_fields(delivery, ba.DETAIL_FIELDS[:4])
+        self.add_fields(delivery, ba.DETAIL_FIELDS[:5])
         extras.addLayout(delivery)
         extras.addWidget(section_title('谁为什么会买'))
         buyer = QFormLayout()
-        self.add_fields(buyer, ba.DETAIL_FIELDS[4:])
+        self.add_fields(buyer, ba.DETAIL_FIELDS[5:])
         self.motive = combo('消费动机（可选）', ('请选择', *ba.MOTIVES[1:]))
         self.motive.currentIndexChanged.connect(self.changed)
         buyer.addRow('消费动机（可选）', self.motive)
@@ -127,6 +127,7 @@ class BusinessAnalysisPane(QWidget):
         self.notice = wrapped()
         self.notice.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.notice)
+        layout.addWidget(wrapped('待接入 · 行业资料整理。交接主流产品、购买路径、交付和顾虑的来源。'))
         actions = QHBoxLayout()
         self.reload_button = button('撤回未保存修改', self.reload_card)
         actions.addWidget(self.reload_button)
@@ -135,6 +136,7 @@ class BusinessAnalysisPane(QWidget):
         actions.addWidget(self.save_button)
         self.draft_button = button('带入选题草稿', lambda: self.open_draft(self.card), True)
         actions.addWidget(self.draft_button)
+        actions.addWidget(button('继续账号定位', next_stage))
         layout.addLayout(actions)
         self.set_topic(None)
         self.start_new()
@@ -181,13 +183,13 @@ class BusinessAnalysisPane(QWidget):
         layout.addLayout(actions)
         dialog.exec()
 
-    def open(self):
+    def open(self, preferred_card=''):
         if not self.dirty():
             self.refresh_library()
-            if self.link:
-                index = self.library.findData(self.link['card_id'])
-                if index > 0:
-                    self.choose_card(index)
+            card_id = preferred_card or (self.link['card_id'] if self.link else '')
+            index = self.library.findData(card_id)
+            if index > 0:
+                self.choose_card(index)
 
     def refresh_library(self):
         self.cards = {card['id']: card for card in self.store.cards()}
@@ -216,9 +218,9 @@ class BusinessAnalysisPane(QWidget):
 
     def load_card(self, card):
         self.loading = True
-        self.card = deepcopy(card)
+        self.card = {**ba.new_card(), **deepcopy(card)}
         for key, widget in self.inputs.items():
-            widget.setText(card[key])
+            widget.setText(self.card[key])
         self.bottleneck.setCurrentText(card['bottleneck'])
         self.motive.setCurrentIndex(ba.MOTIVES.index(card['motive']))
         for row in self.rows[:]:

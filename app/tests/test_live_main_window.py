@@ -74,7 +74,7 @@ class LiveMainWindowTests(unittest.TestCase):
         self.assertIs(main._ensure_page_loaded(8),main.stack.widget(0))
         from src.ui.main_window import CONTENT_WORKBENCH_PAGE, CREATOR_WORKBENCH_PAGE
         self.assertEqual(main.stack.count(), CREATOR_WORKBENCH_PAGE + 1)
-        self.assertTrue(any(index == CREATOR_WORKBENCH_PAGE and label.text() == '视频制作'
+        self.assertTrue(any(index == CREATOR_WORKBENCH_PAGE and label.text() == '对标与选题'
                             for index, _, _, _, label, _ in main._page_navs))
         self.assertTrue(any(index == CONTENT_WORKBENCH_PAGE and label.text() == '文案精选'
                             for index, _, _, _, label, _ in main._page_navs))

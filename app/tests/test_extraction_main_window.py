@@ -394,3 +394,144 @@ class ExtractionMainWindowTests(fixture.ExtractionWorkspaceTests):
             self.until(lambda:second.state==TaskState.RUNNING)
             self.assertEqual(first.state,TaskState.CANCELLED)
             self.main._cancel_task(second.id);_FakeWorker.instances[-1].finish_thread()
+
+    def test_sidebar_opens_business_and_brief_on_the_same_creator_page(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        from src.core.creator_workbench import CreatorStore, new_topic
+        from src.core.creator_workflow import COMMERCIAL
+        from src.ui.main_window import CREATOR_WORKBENCH_PAGE
+
+        rows = {kind: row for index, kind, row, *_ in self.main._page_navs
+                if index == CREATOR_WORKBENCH_PAGE}
+        self.assertEqual(rows['business'].accessibleName(), '导航：商业分析')
+        self.assertEqual(rows['brief'].accessibleName(), '导航：商单 Brief 拆解')
+        QTest.mouseClick(rows['brief'], Qt.MouseButton.LeftButton)
+        page = self.main.creator_page
+        self.assertTrue(page.empty_brief.isVisible())
+        self.assertIs(page.production_tabs.currentWidget(), page.script_tabs)
+
+        store = CreatorStore(self.root / 'data/creator-workbench')
+        topic = new_topic('早期选题')
+        step = COMMERCIAL.steps[0].key
+        topic['workflow'] = {step: {'input': '原 Brief', 'output': '原卖点', 'done': True}}
+        store.save(topic)
+        QTest.mouseClick(rows['business'], Qt.MouseButton.LeftButton)
+        self.assertTrue(page.business.isVisible())
+        self.assertTrue(rows['business'].property('selected'))
+        page.business.inputs['product'].setText('暂存的产品卡输入')
+
+        QTest.keyClick(rows['brief'], Qt.Key.Key_Return)
+        self.assertFalse(page.business.isVisible())
+        self.assertTrue(rows['brief'].property('selected'))
+        self.assertFalse(rows['workflow'].property('selected'))
+        self.assertIs(self.main.stack.currentWidget(), page)
+        self.assertEqual(page.topic['id'], topic['id'])
+        brief = page.script_tabs.currentWidget()
+        self.assertEqual(brief.steps.count(), 5)
+        self.assertEqual(brief.output.toPlainText(), '原卖点')
+        brief.output.setPlainText('原卖点与新备注')
+
+        QTest.mouseClick(rows['business'], Qt.MouseButton.LeftButton)
+        self.assertEqual(page.business.inputs['product'].text(), '暂存的产品卡输入')
+        self.assertEqual(store.topics()[0]['workflow'][step]['output'], '原卖点与新备注')
+        QTest.mouseClick(rows['workflow'], Qt.MouseButton.LeftButton)
+        self.assertEqual(page.navigation_section(), 'workflow')
+        self.assertTrue(rows['workflow'].property('selected'))
+        page.production_tabs.setCurrentWidget(page.script_tabs)
+        page.script_tabs.setCurrentWidget(brief)
+        self.assertTrue(rows['brief'].property('selected'))
+
+    def test_research_sidebar_links_existing_products_and_previews_a_new_topic(self):
+        from PySide6.QtCore import Qt, QTimer
+        from PySide6.QtTest import QTest
+        from PySide6.QtWidgets import QApplication, QPushButton
+        from src.core.business_analysis import new_card
+        from src.core.creator_planning import PlanningStore
+        from src.core.creator_workbench import new_topic
+        from src.ui.creator_planning import PlanningDraftDialog
+        from src.ui.main_window import CREATOR_WORKBENCH_PAGE
+
+        sections = [(kind, row, label.text()) for index, kind, row, _, label, _ in self.main._page_navs
+                    if index == CREATOR_WORKBENCH_PAGE]
+        self.assertEqual([label for _, _, label in sections[:8]],
+                         ['候选赛道', '商业分析', '账号定位', '对标与选题', '文案', '拍摄', '后期', '发布与复盘'])
+        rows = {kind: row for kind, row, _ in sections}
+        QTest.mouseClick(rows['track'], Qt.LeftButton)
+        page = self.main.creator_page
+        plan = page.planning
+        self.assertTrue(plan.direction.isVisible())
+        self.assertFalse(page.topic_area.isVisible())
+
+        old = new_topic('已有选题')
+        old['workflow'] = {'brief-points': {'input': '已有 Brief', 'done': True}}
+        page.store.save(old)
+        card = page.business.store.save(dict(new_card(), product='测试寄养服务'))
+        for key, value in dict(track='寄养选择', audience='出差的养猫人', scene='不确定猫能否适应寄养',
+                               evidence='能展示试住过程和原始观察记录').items():
+            widget = plan.inputs[key]
+            if key in ('track', 'audience'):
+                widget.setText(value)
+            else:
+                widget.setPlainText(value)
+        QTest.mouseClick(plan.save_button, Qt.LeftButton)
+
+        QTest.mouseClick(rows['position'], Qt.LeftButton)
+        self.assertEqual([plan.positioning.tabText(i) for i in range(3)], ['内容调研', '账号定位', '首批内容'])
+        plan.products.setCurrentIndex(plan.products.findData(card['id']))
+        plan.inputs['format'].setPlainText('https://example.test/video 00:08–00:15 展示试住过程')
+        plan.inputs['first_topic'].setText('试住前要看什么')
+        plan.inputs['trust'].setPlainText('怎么判断寄养环境和应激迹象？')
+        QTest.mouseClick(plan.save_button, Qt.LeftButton)
+        saved = PlanningStore(page.store).plans()[0]
+        self.assertEqual(saved['revision'], 2)
+        self.assertEqual(saved['business_card_id'], card['id'])
+        self.assertTrue(saved['trust'])
+        QTest.mouseClick(rows['business'], Qt.LeftButton)
+        self.assertEqual(page.business.card['id'], card['id'])
+        QTest.mouseClick(rows['position'], Qt.LeftButton)
+        self.assertEqual(plan.read(), saved)
+
+        outcomes = []
+
+        def handle_preview(accept):
+            dialog = QApplication.activeModalWidget()
+            try:
+                self.assertIsInstance(dialog, PlanningDraftDialog)
+                self.assertIn('00:08', dialog.inputs['references'].toPlainText())
+                if accept:
+                    save = next(b for b in dialog.findChildren(QPushButton) if b.text() == '保存选题卡')
+                    dialog.inputs['evidence'].clear()
+                    save.click()
+                    self.assertIs(dialog, QApplication.activeModalWidget())
+                    self.assertEqual(page.store.topics(), [old])
+                    dialog.inputs['evidence'].setPlainText('实际观察记录与时间')
+                    save.click()
+                else:
+                    dialog.reject()
+                outcomes.append(accept)
+            finally:
+                dialog.close()
+
+        QTimer.singleShot(0, lambda: handle_preview(False))
+        QTest.mouseClick(plan.draft_button, Qt.LeftButton)
+        self.assertEqual(page.store.topics(), [old])
+        QTimer.singleShot(0, lambda: handle_preview(True))
+        QTest.mouseClick(plan.draft_button, Qt.LeftButton)
+        self.assertEqual(outcomes, [False, True])
+        created, original = page.store.topics()
+        self.assertEqual(original, old)
+        self.assertEqual(created['planning_context']['id'], saved['id'])
+        self.assertEqual(created['brief']['证据与待核实'], '实际观察记录与时间')
+        self.assertIn('00:08', created['sources'][0]['text'])
+        self.assertEqual(page.navigation_section(), 'workflow')
+        self.assertTrue(page.plan_button.isVisible())
+        page.plan_button.click()
+        self.assertEqual(page.navigation_section(), 'position')
+        self.assertEqual(plan.plan['id'], saved['id'])
+
+        for route in ('workflow', 'script', 'shoot', 'post', 'publish', 'brief'):
+            QTest.mouseClick(rows[route], Qt.LeftButton)
+            self.assertEqual(page.navigation_section(), route)
+            self.assertTrue(rows[route].property('selected'))
+        self.assertEqual(page.store.topics()[-1], old)

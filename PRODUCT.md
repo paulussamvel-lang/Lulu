@@ -44,4 +44,4 @@ Show the next action and task state clearly. Preserve source material and proven
 
 ## Accessibility & Inclusion
 
-Use concise, actionable language, reduce competing controls, and keep primary actions visible. Design priority: download → transcription → manuscript → voice as a continuous workflow.
+Use concise, actionable language, reduce competing controls, and keep primary actions visible. Organize the main workflow in production order: candidate track, business analysis, account positioning, benchmarking and topics, writing, shooting, post-production, release and review. Show media and editorial tools where they are used.
