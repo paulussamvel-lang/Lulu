@@ -167,6 +167,10 @@ def canonical_sha(value: dict) -> str:
 
 
 def is_safe_manual_url(url: str) -> bool:
+    from ...branding import WORKSPACE_RELEASES
+
+    if url == WORKSPACE_RELEASES:
+        return True
     if url == RELEASES_URL:
         return True
     return any(

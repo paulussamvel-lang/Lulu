@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from ..core.updater.models import UpdateError, UpdateSnapshot
 from ..core.updater.service import UpdateService
 from ..core.updater.constants import MANUAL_DOWNLOAD_URL
+from ..branding import WORKSPACE_RELEASES
 from ..version import __build__, __version__
 from .. import edition
 from . import theme as T
@@ -173,6 +174,11 @@ class UpdateController(QObject):
         super().__init__(parent)
         self.service = service
         self.snapshot = service.snapshot if service is not None else UpdateSnapshot(current_version=__version__, current_build=__build__)
+        if edition.is_workspace_installation():
+            self.snapshot = UpdateSnapshot(
+                current_version=__version__, current_build=__build__, ui_state="manual_required",
+                error_code="workspace_manual_release", manual_url=WORKSPACE_RELEASES,
+            )
         self.active_work = active_work or (lambda: False)
         self.unsaved_work = unsaved_work or (lambda: False)
         self._worker = None
@@ -402,6 +408,8 @@ class UpdateController(QObject):
         self.publish()
 
     def _ensure_service(self):
+        if edition.is_workspace_installation():
+            return False
         if self.service is None:
             try:
                 self.service = UpdateService()
@@ -445,7 +453,13 @@ def _development_update(snapshot):
     return edition.is_experience() or snapshot.error_code == 'development_edition'
 
 
+def manual_update_url(snapshot):
+    return WORKSPACE_RELEASES if snapshot.error_code == 'workspace_manual_release' else MANUAL_DOWNLOAD_URL
+
+
 def _state_presentation(snapshot):
+    if snapshot.error_code == "workspace_manual_release":
+        return ("neutral", "Paul工作台版本", "版本发布与构建说明见 Paul工作台发布页。", "查看发布页", "")
     if _development_update(snapshot):
         return ('neutral', '开发体验版单独更新', '请使用新版开发体验安装包更新；此版本不检查或安装稳定版更新。', '', '')
     if snapshot.ui_state == "download_error" and snapshot.error_code == "cancelled":
@@ -488,7 +502,7 @@ class UpdatePanel(QFrame):
         self.state_title=ElideLabel(); self.state_title.setObjectName("updateStateTitle"); body.addWidget(self.state_title,1)
         self.meta=QLabel(); self.meta.setObjectName("updateStateMeta"); self.meta.setVisible(False)
         self.actions=QBoxLayout(QBoxLayout.LeftToRight); self.actions.setSpacing(7)
-        self.tertiary=QPushButton("手动下载"); self.tertiary.setObjectName("updateTertiary"); self.tertiary.setFixedHeight(34); self.tertiary.clicked.connect(lambda: self.manual_download.emit(MANUAL_DOWNLOAD_URL)); self.actions.addWidget(self.tertiary)
+        self.tertiary=QPushButton("手动下载"); self.tertiary.setObjectName("updateTertiary"); self.tertiary.setFixedHeight(34); self.tertiary.clicked.connect(lambda: self.manual_download.emit(manual_update_url(self.controller.snapshot))); self.actions.addWidget(self.tertiary)
         self.primary=QPushButton(); self.primary.setObjectName("updatePrimary"); self.primary.setProperty("tier","secondary"); self.primary.setFixedHeight(34); self.primary.setMinimumWidth(112); self.primary.clicked.connect(self._primary); self.actions.addWidget(self.primary)
         self.secondary=QPushButton(); self.secondary.setObjectName("updateSecondary"); self.secondary.setFixedHeight(34); self.secondary.setMinimumWidth(92); self.secondary.clicked.connect(self._secondary); self.actions.addWidget(self.secondary)
         body.addLayout(self.actions); root.addWidget(self.body)
@@ -517,7 +531,7 @@ class UpdatePanel(QFrame):
         state=self.controller.snapshot.ui_state
         if state in ("idle","up_to_date","check_error","manifest_verify_error","verify_error","zip_structure_error","preparation_error","old_version_after_restart","location_error","install_interrupted"): self.controller.check(manual=True)
         elif state in ("update_available","download_error","download_paused","install_error_rollback"): self.controller.download()
-        elif state in ("manual_required","rollback_failed"): self.manual_download.emit(MANUAL_DOWNLOAD_URL)
+        elif state in ("manual_required","rollback_failed"): self.manual_download.emit(manual_update_url(self.controller.snapshot))
         elif state=="installed": self.controller.acknowledge()
         elif state=="downloading": self.controller.cancel()
         elif state=="ready":
@@ -528,8 +542,9 @@ class UpdatePanel(QFrame):
     def render(self, snapshot: UpdateSnapshot):
         tone,title,message,primary,secondary=_state_presentation(snapshot)
         disabled = _development_update(snapshot)
-        self.auto.setVisible(not disabled)
-        self.auto_title.setVisible(not disabled)
+        automatic_available = not disabled and snapshot.error_code != 'workspace_manual_release'
+        self.auto.setVisible(automatic_available)
+        self.auto_title.setVisible(automatic_available)
         if snapshot.ui_state == "check_error" and not disabled:
             message = _check_error_message(snapshot.error_code)
             if snapshot.error_code == "manifest_recheck_required":
@@ -660,7 +675,7 @@ class AboutUpdatePanel(QFrame):
         self.tertiary = self._row_button("手动下载", "手动下载安装包")
         self.tertiary.setObjectName("aboutUpdateTertiary")
         self.tertiary.setVisible(False)
-        self.tertiary.clicked.connect(lambda: self.manual_download.emit(MANUAL_DOWNLOAD_URL))
+        self.tertiary.clicked.connect(lambda: self.manual_download.emit(manual_update_url(self.controller.snapshot)))
         self.secondary = self._row_button("稍后", "稍后更新")
         self.secondary.setObjectName("aboutUpdateSecondary")
         self.secondary.setVisible(False)
@@ -839,7 +854,7 @@ class AboutUpdatePanel(QFrame):
         elif state in ("update_available", "download_error", "download_paused", "install_error_rollback"):
             self.controller.download()
         elif state in ("manual_required", "rollback_failed"):
-            self.manual_download.emit(MANUAL_DOWNLOAD_URL)
+            self.manual_download.emit(manual_update_url(self.controller.snapshot))
         elif state == "installed":
             self.controller.acknowledge()
         elif state == "downloading":
@@ -854,7 +869,7 @@ class AboutUpdatePanel(QFrame):
     def render(self, snapshot: UpdateSnapshot) -> None:
         tone, title, message, primary, secondary = _state_presentation(snapshot)
         disabled = _development_update(snapshot)
-        self.auto_row.setVisible(not disabled)
+        self.auto_row.setVisible(not disabled and snapshot.error_code != 'workspace_manual_release')
         if disabled:
             pass
         elif snapshot.ui_state == "idle":

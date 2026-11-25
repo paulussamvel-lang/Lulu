@@ -1,6 +1,6 @@
 # 从源码构建 Lulu
 
-本版为 **4.3.4 / 20261119.1**，提供实际产品的完整第一方源码、资源、CLI、后台、Skill 与构建入口。第一方 MIT，第三方保留原许可。无需激活码、维护者私钥或维护者的个人资料。
+本版为 **4.3.4 / 20261124.1**，提供实际产品的完整第一方源码、资源、CLI、后台、Skill 与构建入口。第一方 MIT，第三方保留原许可。无需激活码、维护者私钥或维护者的个人资料。
 
 ## 环境与依赖
 
@@ -39,8 +39,8 @@ tar -xzf app/build/asr-sources/moss-source.tar.gz --strip-components=1 -C app/bu
 ```sh
 .venv/bin/python -B app/packaging/product_capability_gate.py   --repo "$PWD" --output /private/tmp/lulu-product-checks.json
 
-export LULU_BUILD_ROOT="$PWD/app/build/phase10-production-20261119.1"
-export LULU_DIST_ROOT="$PWD/app/dist/phase10-production-20261119.1"
+export LULU_BUILD_ROOT="$PWD/app/build/phase10-production-20261124.1"
+export LULU_DIST_ROOT="$PWD/app/dist/phase10-production-20261124.1"
 export LULU_PRODUCTION_RELEASE_AUTHORIZED=1
 export LULU_UPDATE_RELEASE=0
 export LULU_UPDATE_PUBLIC_KEY_PATH="$PWD/app/packaging/update-verification-key.pem"
@@ -51,7 +51,14 @@ export LULU_UPDATE_PUBLIC_KEY_PATH="$PWD/app/packaging/update-verification-key.p
 
 Git 克隆使用公开祖先版本，源码 ZIP 通过 SOURCE_MANIFEST.json 校验后自动建立本地构建记录，均不依赖私人开发提交。修改源码前先按 source_repository.py 的流程准备 Git 记录，再修改并提交；构建要求干净工作区。使用新的输出目录，避免不同构建相互覆盖。
 
-将生成的 Lulu.app 放入“应用程序”运行。已有 Lulu 时先保存资料并退出，再按系统标准方式覆盖。模型与资料独立存放，普通覆盖不会清空。
+## 独立安装与迁移
+
+1. 构建完成后，确认已生成 `canonical-app-tree-receipt.json`，并对产物目录下的 `Lulu.app` 运行 `codesign --verify --deep --strict`。
+2. 如果已安装旧版，先保存工作、等待任务结束并正常退出。保留旧应用和旧启动器的可恢复副本。
+3. 将构建产物 `Lulu.app` 复制到「应用程序」，将副本的名称改为 `Paul工作台.app`，直接打开。首次启动会为新路径建立独立的后台登记。
+4. 按[独立 Agent Skill](agent-skill/README.md)校验安装，再核对旧项目和任务。确认新版可用后，可移除旧的 `Lulu.app` 和转发启动器。保留 `~/Library/Application Support/Lulu`，其中包含应用资料和模型。
+
+MCP 有独立安装入口，见 [Paul工作台 MCP](app/docs/features/paul-workbench-mcp.md)。
 
 ## GUI、安装镜像与配音运行时
 

@@ -24,15 +24,12 @@ from urllib.parse import urlsplit
 
 from .models import Segment, Transcript, TranscriptCover
 from .models_manager import app_data_dir
+from .revision_conflict import RevisionConflict
 
 LIBRARY_DIR = app_data_dir() / "library"
 DOCS_DIR_NAME = "docs"
 _mutation_lock = threading.RLock()
 _lock_state = threading.local()
-
-
-class RevisionConflict(RuntimeError):
-    """A caller's original document no longer matches the saved document."""
 
 
 class FolderIndexError(RuntimeError):

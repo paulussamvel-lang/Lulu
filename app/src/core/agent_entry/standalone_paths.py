@@ -12,14 +12,18 @@ BASE_SERVICE = 'com.lulu.transcribe.agent-core'
 
 def installed_app(app):
     app = Path(app)
-    from ...edition import display_name, valid_app_basename
-    name = display_name() + '.app'
-    allowed = (Path('/Applications')/name, Path.home()/'Applications'/name)
-    if not valid_app_basename(app):
+    from ...branding import WORKSPACE_APP
+    from ...edition import display_name, is_experience, valid_app_basename
+
+    legacy_name = display_name() + '.app'
+    names = {legacy_name} if is_experience() else {legacy_name, WORKSPACE_APP}
+    if app.name not in names or not valid_app_basename(app):
         raise RuntimeError('INSTALLATION_TARGET_AUTHORITY_REQUIRED')
+    allowed = (Path('/Applications')/app.name, Path.home()/'Applications'/app.name)
     if app not in allowed or app.resolve() != app:
         raise RuntimeError('INSTALLATION_TARGET_AUTHORITY_REQUIRED')
-    if app != allowed[0] and not (app/DESCRIPTOR).is_file():
+    requires_descriptor = app.name == WORKSPACE_APP or app != allowed[0]
+    if requires_descriptor and not (app/DESCRIPTOR).is_file():
         raise RuntimeError('INSTALLATION_TARGET_AUTHORITY_REQUIRED')
     return app
 

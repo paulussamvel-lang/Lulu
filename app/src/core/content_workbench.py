@@ -13,6 +13,8 @@ import re
 import tempfile
 from uuid import uuid4
 
+from .revision_conflict import RevisionConflict
+
 FAMILIES = (('', '暂不选择模型'), ('doubao', '豆包'), ('gemini', 'Gemini'),
             ('qwen', '千问'), ('deepseek', 'DeepSeek'))
 REVIEW_VERSION = 'short-video-v1'
@@ -317,7 +319,6 @@ class WorkbenchStore:
 
     def commit(self, request_id, intent_hash, expected_revision, mutate):
         """Publish an additive operation and its replay receipt in one replace."""
-        from .library import RevisionConflict
         with self.locked():
             value = self.load()
             receipts = value.setdefault('request_receipts', {})

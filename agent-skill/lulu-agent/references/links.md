@@ -16,7 +16,7 @@
 从用户请求取得链接、所需项目、现有的绝对保存目录。只缺目录时询问目录；不擅自扩大为全部下载。分享文案中有多个链接时先明确目标。安装未提供所需 EXTRACT 能力时说明版本未接通，不能绕到源码或其他下载器。
 
 ```sh
-/Applications/Lulu.app/Contents/MacOS/lulu-agent-cli extract prepare 'https://www.example.com/work' --outputs video,audio,cover,data --destination '/absolute/existing/directory' --output json
+/Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli extract prepare 'https://www.example.com/work' --outputs video,audio,cover,data --destination '/absolute/existing/directory' --output json
 ```
 
 prepare 不联网、不创建任务。核对 `lulu.link-extraction-plan/v1`、source_url、outputs、destination、destination_identity、installation_id、effects 和 plan_digest。effects 应为 network=true、writes_files=true、uploads_content=false、may_charge=false、runs_model=false。计划摘要只绑定本次选择，不是人类批准证明。
@@ -24,7 +24,7 @@ prepare 不联网、不创建任务。核对 `lulu.link-extraction-plan/v1`、so
 用户已明确要求下载/提取且选择齐全后可执行，无需重复要求“确认八项转录设置”。单纯询问能力或查看计划不授权 run。生成并保存一个 8–128 位字母、数字、下划线或短横线组成的 request-id，填入 prepare 原样返回的摘要：
 
 ```sh
-/Applications/Lulu.app/Contents/MacOS/lulu-agent-cli extract run 'https://www.example.com/work' --outputs video,audio,cover,data --destination '/absolute/existing/directory' --plan-digest '<returned-plan-digest>' --request-id '<saved-unique-request-id>' --output json
+/Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli extract run 'https://www.example.com/work' --outputs video,audio,cover,data --destination '/absolute/existing/directory' --plan-digest '<returned-plan-digest>' --request-id '<saved-unique-request-id>' --output json
 ```
 
 run 返回 job_id、state、reused。保存 job_id，以 jobs show/wait/cancel/receipt 查看任务；接受任务不等于完成。同一 request-id 和计划只对应一个任务。响应不确定时先查询原任务，不换 request-id 盲目重试。变更输出或目录须重新 prepare，不能沿用旧摘要。

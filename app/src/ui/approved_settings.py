@@ -23,7 +23,7 @@ from .settings_page import (
     _SettingsReadWorker, _start_settings_read,
 )
 from .skills_page import LocalSkillDropZone
-from .update_ui import _state_presentation, _development_update
+from .update_ui import _state_presentation, _development_update, manual_update_url
 
 _PREFS = {
     'theme': 'theme',
@@ -50,6 +50,8 @@ def _update(snapshot):
     tone, title, detail, label, _ = _state_presentation(snapshot)
     if _development_update(snapshot):
         return dict(state='disabled', presentation=[title,detail,'','','info'], progress=0, notes='')
+    if snapshot.error_code == 'workspace_manual_release':
+        return dict(state='disabled', presentation=[title,detail,label,'manual-update','download'], progress=0, notes='')
     if ui in {'idle','up_to_date'}:
         detail = '你可以手动检查，也可以让 Lulu 定期查看版本信息。'
     if ui == 'update_available' and snapshot.latest_version:
@@ -570,8 +572,7 @@ class ApprovedSettings(SettingsPage):
         elif action=='install-confirm' and controller.install_gate()=='ok':
             self.install_requested.emit()
         elif action=='manual-update':
-            from .update_ui import MANUAL_DOWNLOAD_URL
-            self.manual_download.emit(MANUAL_DOWNLOAD_URL)
+            self.manual_download.emit(manual_update_url(controller.snapshot))
         else:
             return done(message='当前无法安装更新')
         done(True)

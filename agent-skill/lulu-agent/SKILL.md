@@ -1,19 +1,19 @@
 ---
 name: lulu-agent
-description: Operate Lulu through its verified packaged Agent CLI for manuscript search, edits, conversations, local audio/video transcription (SenseVoice Q8, Whisper MLX, Whisper 4bit, MOSS Q5), speech, and downloading video, audio, covers or public work data from links (作品链接下载/封面/音频/作品数据); discover installed capabilities before acting.
+description: Operate Paul工作台 through its verified packaged Agent CLI for manuscript search, edits, conversations, local audio/video transcription (SenseVoice Q8, Whisper MLX, Whisper 4bit, MOSS Q5), speech, and downloading video, audio, covers or public work data from links (作品链接下载/封面/音频/作品数据); discover installed capabilities before acting.
 ---
 
-# Lulu Agent
+# Paul工作台 Agent
 
-Use the single installed Lulu product through its packaged console adapter. This Skill verifies and invokes only the canonical CLI, prepares untrusted proposals when required, and interprets closed results; it never supplies authority.
+Use the installed Paul工作台 through its packaged console adapter. Prefer the paul-workbench MCP for production topics and editorial records. This Skill verifies and invokes only the canonical CLI, prepares untrusted proposals when required, and interprets closed results; it never supplies authority.
 
 Current guidance follows Lulu 4.3.3. This independent Skill updates separately from the App; discover the installed version and capabilities before using a documented workflow on an older build.
 
 ## Before any CLI use
 
-1. Use only `/Applications/Lulu.app`; do not search PATH or another App.
+1. Use only `/Applications/Paul工作台.app`; do not search PATH or another App.
 2. Read [trust-anchor.md](references/trust-anchor.md), then run `python3 -B scripts/verify_lulu.py` with no arguments. Stop unless generation 9 and the complete closed component set verify.
-3. Invoke only `/Applications/Lulu.app/Contents/MacOS/lulu-agent-cli`. No PATH alias, optional shared Skill or shell shortcut is required.
+3. Invoke only `/Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli`. No PATH alias, optional shared Skill or shell shortcut is required.
 4. In Codex, run the canonical CLI with execution permission to access the current-user macOS Mach/XPC service (the local, outside-sandbox execution mode). A restricted sandbox can deny this channel even while Lulu and Core are healthy. Never work around it with another executable, source imports, sockets, or daemon.
 5. Read [protocol.md](references/protocol.md) before parsing a result or preparing a proposal. Unknown fields, versions, enums, capabilities, schemas, or errors fail closed.
 

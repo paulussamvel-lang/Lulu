@@ -26,7 +26,7 @@ Read the exact target's `project_id` and workspace `revision` before writing; ne
 工作区命令统一为：
 
 ```text
-/Applications/Lulu.app/Contents/MacOS/lulu-agent-cli workspace <group> <verb> --request <absolute-json-file> --output json
+/Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli workspace <group> <verb> --request <absolute-json-file> --output json
 ```
 
 请求文件内容是参数对象，不是 intent-proposal；不要放入 approved、issuer、授权凭据或模型密钥。JSON 文件为普通文件、最多 8 MB，重复请求保留同一 request_id 和相同内容。将自由文本写入 JSON 文件，绝不拼成 shell 命令。

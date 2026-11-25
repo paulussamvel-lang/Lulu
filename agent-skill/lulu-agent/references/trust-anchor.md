@@ -1,6 +1,6 @@
 # Verify the installed product
 
-1. Accept only `/Applications/Lulu.app` and its `/Applications/Lulu.app/Contents/MacOS/lulu-agent-cli`, using the current-user service selected by the verified installation.
+1. Accept only `/Applications/Paul工作台.app` and its `/Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli`, using the current-user service selected by the verified installation.
 2. Run `python3 -B scripts/verify_lulu.py` from this Skill directory, with no arguments. It checks generation 9, committed installation materials, the exact external manifest bytes, the full App tree, constrained relative links and native signatures for delivery v2. It does not import App code or read Keychain. Core independently verifies HMAC ownership before business.
 3. Continue only with `lulu.install-verification/v2`, `verified=true`, candidate generation 9 and CLI protocol `1.0.0`. Query actual installed capabilities next. Unknown versions fail closed.
 4. This public Skill is optional and is not part of Lulu's signed installation. It does not require `~/.local/bin/lulu` or `~/.agents/skills/lulu-agent`. The App's bundled Skill resources remain part of the verified App tree.
@@ -19,7 +19,7 @@ The public Skill can be upgraded separately from Lulu and does not depend on the
 
 ## Recovery by installation format
 
-- **Standalone App, first preparation or system authorization unfinished:** open `/Applications/Lulu.app` normally and let the user finish any macOS authorization. If preparation fails again, preserve the reason and diagnostics and stop; do not loop through reinstall attempts. A malformed or unreadable standalone descriptor must not fall back to legacy recovery.
+- **Standalone App, first preparation or system authorization unfinished:** open `/Applications/Paul工作台.app` normally and let the user finish any macOS authorization. If preparation fails again, preserve the reason and diagnostics and stop; do not loop through reinstall attempts. A malformed or unreadable standalone descriptor must not fall back to legacy recovery.
 - **Standalone App, damaged files or inconsistent existing materials:** stop and preserve diagnostics for the developer. Re-copying the same App may leave damaged external records unchanged; do not promise that it repairs them. If a replacement is needed, use an authorized product update or the standard DMG drag-to-Applications flow. This format contains `Lulu.app` and `Applications`, with no separate “安装 Lulu” program. Never delete installation records or user data to force preparation.
 - **Legacy installation without a standalone descriptor:** use its matching complete official delivery and its included installer, only when that legacy package actually provides one and the repair is authorized. Do not use legacy records to repair a standalone generation.
 - **Only the independent Skill is outdated:** update it through its own documented manager, then verify Lulu again. Updating this Skill does not update App components. Do not repeatedly reinstall Lulu or change its managed Skill to repair an independent copy.

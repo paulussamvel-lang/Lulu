@@ -78,8 +78,17 @@ def optional_integration_targets() -> tuple[Path, Path]:
     return Path.home() / ".agents/skills/lulu-agent", Path.home() / ".local/bin/lulu"
 
 
+def is_workspace_installation() -> bool:
+    from .branding import WORKSPACE_APP
+
+    return bool(getattr(sys, "frozen", False)
+                and Path(sys.executable).parent.parent.parent.name == WORKSPACE_APP)
+
+
 def valid_app_basename(app: Path) -> bool:
-    if app.name == "Lulu.app":
+    from .branding import WORKSPACE_APP
+
+    if app.name in {"Lulu.app", WORKSPACE_APP}:
         return True
     if app.name != EXPERIENCE_META["artifact_prefix"] + ".app":
         return False

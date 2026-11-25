@@ -19,7 +19,7 @@ Use only closed error objects from schema `lulu.agent/v1`. Unknown error codes s
 
 ## Local XPC transport
 
-Codex must allow local Mach/XPC communication before invoking /Applications/Lulu.app/Contents/MacOS/lulu-agent-cli. Native code 20 can be a sandbox denial; it alone does not prove Core is down or the installation is damaged. CORE_TRANSPORT_UNAVAILABLE / CORE_TRANSPORT_TIMEOUT with phase=pre_dispatch and effect_count=0 confirms no business command was sent. Allow local XPC and use the same verified CLI; do not add a fallback or start a different service.
+Codex must allow local Mach/XPC communication before invoking /Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli. Native code 20 can be a sandbox denial; it alone does not prove Core is down or the installation is damaged. CORE_TRANSPORT_UNAVAILABLE / CORE_TRANSPORT_TIMEOUT with phase=pre_dispatch and effect_count=0 confirms no business command was sent. Allow local XPC and use the same verified CLI; do not add a fallback or start a different service.
 
 CORE_REQUEST_OUTCOME_UNKNOWN with phase=dispatched and effect_count=unknown means a command may have reached Core. Do not replay. Read original jobs/status/receipts with local XPC permission and reconcile the result first. All transport errors are closed lulu.agent/v1 JSON with retryable=false; traceback or unknown output is not authority.
 

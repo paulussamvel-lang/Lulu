@@ -1,7 +1,7 @@
 # Four local voice models
 
 Read current capabilities and `tts status --output json` before generation. These commands use the
-verified installed `/Applications/Lulu.app/Contents/MacOS/lulu-agent-cli` launcher. An older installation may expose only VoxCPM2.
+verified installed `/Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli` launcher. An older installation may expose only VoxCPM2.
 Do not use source scripts or model workers to bypass unavailable installed capabilities.
 
 The text file and JSON settings file must be absolute, owned regular files (not symlinks), readable
@@ -55,7 +55,7 @@ returned by status. Also supports temperature and repetition_penalty.
 ## Command example
 
 ```sh
-/Applications/Lulu.app/Contents/MacOS/lulu-agent-cli tts synthesize --engine local_indextts2 --text-file /absolute/script.txt --voice-id VOICE_ID --options-file /absolute/settings.json --destination /absolute/new-voice.wav --output json
+/Applications/Paul工作台.app/Contents/MacOS/lulu-agent-cli tts synthesize --engine local_indextts2 --text-file /absolute/script.txt --voice-id VOICE_ID --options-file /absolute/settings.json --destination /absolute/new-voice.wav --output json
 ```
 
 Do not report audio generated until the task succeeded and the receipt's WAV exists, is readable,

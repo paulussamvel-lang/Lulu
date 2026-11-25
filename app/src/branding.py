@@ -1,6 +1,8 @@
 """User-facing workspace name, independent of stable storage and CLI identities."""
 
 WORKSPACE_NAME = "Paul工作台"
+WORKSPACE_APP = WORKSPACE_NAME + ".app"
+WORKSPACE_RELEASES = "https://github.com/paulussamvel-lang/Lulu/releases"
 
 
 def workspace_name():

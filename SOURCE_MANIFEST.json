@@ -1,9 +1,9 @@
 {
   "schema": 2,
   "version": "4.3.4",
-  "build": "20261119.1",
-  "product_release": "source-20261119.1",
-  "base_public_revision": "a5ee1028b395d5eac1200d311efa127239e7e176",
+  "build": "20261124.1",
+  "product_release": "source-20261124.1",
+  "base_public_revision": "e8bf66c430444b1ccd2de3e6727e0c98794c9c32",
   "files": [
     {
       "path": ".gitignore",
@@ -13,8 +13,8 @@
     },
     {
       "path": "BUILDING.md",
-      "size": 4556,
-      "sha256": "341514919186db7dba611af604cb22f0bf7a9d69c4c5b7652a5bbafcb6773a49",
+      "size": 5208,
+      "sha256": "900b66908e5ea4fce5d51b32bc3a9e3773ca85ce3535ee3575b16e73a053a5bb",
       "mode": "100644"
     },
     {
@@ -31,8 +31,8 @@
     },
     {
       "path": "README.md",
-      "size": 6303,
-      "sha256": "b8206916f42473f64ebe0a0b9d5e40f4432b091eb1fc9d4247d3f6411594e383",
+      "size": 6788,
+      "sha256": "5f38e0d97fef7fb3ec7964d721f26890e8ed4366182a8b7a0d139927eab55dc7",
       "mode": "100644"
     },
     {
@@ -49,20 +49,20 @@
     },
     {
       "path": "agent-skill/README.md",
-      "size": 7196,
-      "sha256": "d006023a62b95a4ede0463ea7a9850a6d1fcd6e81193645dc1884f1e6ce64eb0",
+      "size": 6890,
+      "sha256": "15bc010b418783b946ad83a8717b98f2efb738984ce7a246b728d52f6a1736bc",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/SKILL.md",
-      "size": 5084,
-      "sha256": "4c56f12614b52b4a16c588546446a10273cebac3762c417b707ee9645b6879b2",
+      "size": 5189,
+      "sha256": "a44f3f71ff382fa8b9ed38a5e42a3385d1fdb91a3451e3a9d61dc630aa8a17d5",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/references/errors.md",
-      "size": 5980,
-      "sha256": "c644366f398fd27ee41589dd9c466aca837e0480fc32e42b42632758102d8ca1",
+      "size": 5989,
+      "sha256": "462853589edd772e252b3b87ffa9bde35e91c539a9c343234fe79ae3ac6da6c0",
       "mode": "100644"
     },
     {
@@ -73,50 +73,50 @@
     },
     {
       "path": "agent-skill/lulu-agent/references/links.md",
-      "size": 4605,
-      "sha256": "4db0b610e5437d2346d4084ed27d75342e1b940698b626970a8483ebbed7d33b",
+      "size": 4623,
+      "sha256": "5e258ffb4032368f0fdc9a365a75cdf6891dbccde4c088360a148f2b5911963d",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/references/protocol.md",
-      "size": 7173,
-      "sha256": "bd96a515d2f3c474e906b6c88e102e1062cc65046f3fae0168729e1caaa4eaae",
+      "size": 7182,
+      "sha256": "7a0251d6448be130f06c2a357bcc22e391c08d2dc4cba274997956cdb80fa696",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/references/trust-anchor.md",
-      "size": 5041,
-      "sha256": "dafe684b82787dd663c2f871f9ce7cc27e8a429027c241bd764dc5e43c8e353a",
+      "size": 5068,
+      "sha256": "009f1370e979d61c1c8c7e9e20075d12aad049a27624eb059d951273bc66ab0f",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/references/voice.md",
-      "size": 3054,
-      "sha256": "2728856f13ed281a28b996cbed10d5b10351ccbd9d31891b433b4c076640ed8f",
+      "size": 3072,
+      "sha256": "e1a91e85c0ab2f5a0728d61b8202710b909fa812aeeeea593b6a6f7ae338cf6a",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/references/workflows.md",
-      "size": 10857,
-      "sha256": "d74d4da0fe3e29c95eb4dbe3aa4e30da746cd61df829041639a36e510950bc54",
+      "size": 10965,
+      "sha256": "c7c8a8e64386cafe280c8267b5bc3ec36a314bc80416b2ae4a1195c03c04fe41",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/references/workspace.md",
-      "size": 10302,
-      "sha256": "077072b5071faaaa2a329bf28ae5e647cffa26e78321a602aa283fca219849a2",
+      "size": 10311,
+      "sha256": "f8043473dfb934137b74313dff3fed75ac97c3fedcc8a2352318f660d90efe36",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/scripts/verify_delivery_tree_v2.py",
-      "size": 7181,
-      "sha256": "923b6b3055dfb9feb7723422124f246d79eb0ce2d888c0a9b0ef4187b07dd9e3",
+      "size": 7190,
+      "sha256": "2bae292a8f501954e25304f47d0690ec62d16d2d5538814267088c0191a0cd76",
       "mode": "100644"
     },
     {
       "path": "agent-skill/lulu-agent/scripts/verify_lulu.py",
-      "size": 19596,
-      "sha256": "55ec7081e289cb9485f3bd00aedd26c7cef769a99e30875cc17e5bd992ceffb5",
+      "size": 19605,
+      "sha256": "1e9ae4a5de09bcb77f0cc4fcbc6bde19dfcbfed5d255a047ce630cc5da10a500",
       "mode": "100644"
     },
     {
@@ -153,6 +153,12 @@
       "path": "app/docs/features/creator-workbench.md",
       "size": 3770,
       "sha256": "4c0ec84f3a1335a8575d3083f5c5bf5419c9727fbfc76c79bb74338160dbfafb",
+      "mode": "100644"
+    },
+    {
+      "path": "app/docs/features/paul-workbench-mcp.md",
+      "size": 1529,
+      "sha256": "92efb8c51b8eeb5e9bd5b791d63e00f553bc83f7294fdc9bdea20a57476bdc6f",
       "mode": "100644"
     },
     {
@@ -315,6 +321,12 @@
       "path": "app/packaging/hooks/hook-PySide6.QtWebEngineCore.py",
       "size": 704,
       "sha256": "f81247794aee4c95f4807d292a808436e42d9d6d08d9b541c2c4d2e1d1a0b194",
+      "mode": "100644"
+    },
+    {
+      "path": "app/packaging/install_paul_workbench_mcp.py",
+      "size": 909,
+      "sha256": "2df9584f7b6dbabf97787e4a49a52789e6119a45de36a62ef697813859ead018",
       "mode": "100644"
     },
     {
@@ -775,8 +787,8 @@
     },
     {
       "path": "app/src/branding.py",
-      "size": 260,
-      "sha256": "1664af464e4a6c35895b0fb9774ad053a34e504308e28f2efb3a63d4ee3262ef",
+      "size": 374,
+      "sha256": "663602fa62bf6d698b9dc104f594920ff8765f2a3747eefefa7b3fd455b2068e",
       "mode": "100644"
     },
     {
@@ -937,8 +949,8 @@
     },
     {
       "path": "app/src/core/agent_entry/standalone_paths.py",
-      "size": 1485,
-      "sha256": "82aa0ec76a59dc82ffb0ab79a90a023c817292c0dcc88ab71637a5ce31fd4c66",
+      "size": 1737,
+      "sha256": "4fe151a1a117c202bcd0c21ee186be1006333f512c16bb84d0c3799a073e88a2",
       "mode": "100644"
     },
     {
@@ -1597,8 +1609,8 @@
     },
     {
       "path": "app/src/core/content_workbench.py",
-      "size": 17725,
-      "sha256": "36d38a5a5dd08d32748c05022a1373664f94c8fe941970d8d0620dd07a59537a",
+      "size": 17728,
+      "sha256": "6f3d4b9e0e940604043615cd9af91ca3728f1dd042f83e4919fb0b544605c64a",
       "mode": "100644"
     },
     {
@@ -1861,8 +1873,8 @@
     },
     {
       "path": "app/src/core/library.py",
-      "size": 59474,
-      "sha256": "8470f109c35887f4795c1858d43724c940162f5ee0399cce3dca8f679c8058dd",
+      "size": 59405,
+      "sha256": "ad8e5b097548ca87d5803673599f56da6f89a0f91f9df87ba6f037ff74156e9c",
       "mode": "100644"
     },
     {
@@ -2181,6 +2193,12 @@
       "path": "app/src/core/resource_control/service.py",
       "size": 7137,
       "sha256": "aa74fdc5d11c0cd5b7779b5dbba141525593534379e62f1673d3b401d3936dd4",
+      "mode": "100644"
+    },
+    {
+      "path": "app/src/core/revision_conflict.py",
+      "size": 109,
+      "sha256": "f7bc578a76b38de2fc2a38c798931552ed9fc016558e59266c8c1df43d92b520",
       "mode": "100644"
     },
     {
@@ -2557,8 +2575,8 @@
     },
     {
       "path": "app/src/core/updater/manifest.py",
-      "size": 8191,
-      "sha256": "7e5dbc400ef48ac579afabcaa83dab1e361213e81299e5ec1c755787782d4712",
+      "size": 8293,
+      "sha256": "5cc4b867436ae14c7f7a98f94953b1a98350a70adae86f3de374db917fba660a",
       "mode": "100644"
     },
     {
@@ -2617,14 +2635,20 @@
     },
     {
       "path": "app/src/edition.py",
-      "size": 3151,
-      "sha256": "2e66c86cd542bdfe74102cb12483083959674af103a3f00d099f773e899aa1a6",
+      "size": 3424,
+      "sha256": "ac9c9050d4c85d47296f18f31e90409555860f0ade85b2d7ec744c284897f3ca",
       "mode": "100644"
     },
     {
       "path": "app/src/main.py",
       "size": 7972,
       "sha256": "0f4db648a9d61b542893e21d6f8e340995efa322e389277ef6b8c33bb384e151",
+      "mode": "100644"
+    },
+    {
+      "path": "app/src/paul_workbench_mcp.py",
+      "size": 10889,
+      "sha256": "a019cd655586bae9033cc51760830fec56933316b325007be52545909345bcbd",
       "mode": "100644"
     },
     {
@@ -2803,8 +2827,8 @@
     },
     {
       "path": "app/src/ui/approved_settings.py",
-      "size": 28378,
-      "sha256": "b0ac54be264e22d3104371872c81094b86c66fbf6f8ff4eda3f1098dd2d63cb5",
+      "size": 28541,
+      "sha256": "bfa6339aaa34437f8fe55eb65628789aaf2277ea16dbeb0e4bb33ca35e64fae6",
       "mode": "100644"
     },
     {
@@ -3229,8 +3253,8 @@
     },
     {
       "path": "app/src/ui/cli_info.py",
-      "size": 4660,
-      "sha256": "3784456a09525331868044c88276ef472922d30a61dd4c455eec1cddcd97fe01",
+      "size": 5111,
+      "sha256": "c41dfd9b56332591ba247bede4786f6ba90eec1987ee1c30fbe4f7098380a415",
       "mode": "100644"
     },
     {
@@ -3841,8 +3865,8 @@
     },
     {
       "path": "app/src/ui/update_ui.py",
-      "size": 55968,
-      "sha256": "26efe3499fe0b85f67163988a0467acf660ad7acc7977a04597fb865acaad72f",
+      "size": 56968,
+      "sha256": "a9abc3d4225047689cecd155baf8d912d0dc3dbcb3238c57f0f64ba10bcc9c21",
       "mode": "100644"
     },
     {
@@ -3914,7 +3938,7 @@
     {
       "path": "app/src/version.py",
       "size": 2988,
-      "sha256": "dfa81a2ae17bcafd0caff072f7bd51834fc18c9fd90582f5da17218093f01b92",
+      "sha256": "9460346df01fb71a6c16c1ad0f74a5439267c11f9a260dbb51f74b6e572b1d46",
       "mode": "100644"
     },
     {
@@ -5637,6 +5661,12 @@
       "path": "app/tests/test_workbench_palettes.py",
       "size": 4809,
       "sha256": "d12b5b1355c82f5dae749074a8d8bdbff50407d53a908bb6ff0b1acfb0e5998d",
+      "mode": "100644"
+    },
+    {
+      "path": "app/tests/test_workspace_installation_name.py",
+      "size": 1200,
+      "sha256": "c0b35ed31a778220e4d48d750d323ce6cf543b112e895168ed67a0b2a70d2ad5",
       "mode": "100644"
     },
     {

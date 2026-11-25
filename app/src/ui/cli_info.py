@@ -39,6 +39,14 @@ CLI_UNAVAILABLE = (
 
 
 def agent_skill_install_prompt(repository_url: str) -> str:
+    if edition.is_workspace_installation():
+        cli = shlex.quote(agent_cli_path())
+        return (
+            '选题和文案精选请使用 paul-workbench MCP。音视频任务使用 Paul工作台包内 CLI。\n'
+            f'固定入口：{agent_cli_path()}\n'
+            f'运行 {cli} capabilities --output json，核对实际版本与可用能力。\n'
+            '后续只使用这个入口。此步骤只验证连接。'
+        )
     if edition.is_experience():
         cli = shlex.quote(agent_cli_path())
         return (

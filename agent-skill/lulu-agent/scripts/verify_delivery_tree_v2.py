@@ -51,7 +51,7 @@ def _fail(code="AGENT_ENTRY_COMPONENT_MISMATCH"):
 
 def _root(app: Path) -> Path:
     app = Path(app)
-    if not app.is_absolute() or app.name != "Lulu.app":
+    if not app.is_absolute() or app.name != "Paul工作台.app":
         raise _fail()
     metadata = app.lstat()
     if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):

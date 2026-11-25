@@ -1,12 +1,12 @@
 # Lulu Agent Skill
 
-让你常用的 Agent 调用本机 Lulu，处理文稿、转录、配音与素材任务。技能按需安装，也可单独卸载；无需重新下载 Lulu。
+让 Agent 通过工作台内置 CLI 处理文稿、转录、配音和素材任务。视频制作和文案精选可使用 [Paul工作台 MCP](../app/docs/features/paul-workbench-mcp.md)。
 
 [下载仓库 ZIP（技能位于 agent-skill）](https://github.com/paulussamvel-lang/Lulu/archive/refs/heads/main.zip) · [安装方法](#安装) · [Paul工作台源码](https://github.com/paulussamvel-lang/Lulu)
 
-当前定制说明已按 **Paul工作台 4.3.4 / 20261115.1** 核对，新增文案精选选题查询、新建与候选文案写入；原有转录、配音、采集和直播接口按安装包实际返回的清单使用。此仓库当前提供源码与完整 Skill；上游安装包不包含新增的 editorial 接口。CLI 随 App 提供，无需单独下载。
+此技能已在 **Paul工作台 4.3.4 / 20261124.1** 核对。CLI 随工作台提供，文案、转录、配音、采集和直播能力以实际安装返回的清单为准。
 
-**Skill 与 App 独立更新。** 继续使用原有安装检查工具和 CLI 1.0.0 协议；新增接口需要已安装 20261115.1 或兼容版本。不会替换 App 内的受管 Skill，也不改动文稿、模型、音色或任务。已单独安装的 Skill 需要按下方方法更新；更新 App 不会自动覆盖这个独立副本。
+**Skill 与 App 独立更新。** 继续使用原有安装检查工具和 CLI 1.0.0 协议；此版 Skill 使用独立安装的 Paul工作台。不会替换 App 内的受管 Skill，也不改动文稿、模型、音色或任务。已单独安装的 Skill 需要按下方方法更新；更新 App 不会自动覆盖这个独立副本。
 
 ## 可以做什么
 
@@ -26,13 +26,13 @@
 
 主页采集使用 Lulu 专用浏览器登录，与日常浏览器资料分开。CLI 通过采集模式明确选择匿名读取、使用专用登录读取最新一页或全量读取；需要扫码或验证时由使用者本人操作。具体模式、受限后的处理和结果保留见 [采集调用说明](lulu-agent/references/expansion.md#douyin-collection-and-rss)。
 
-当前支持 macOS、`/Applications/Lulu.app` 中的 Lulu generation 9 安装，以及 CLI 1.x 中已验证的 1.0.0 协议。同时识别旧版 DMG 安装和新版 App 自包含安装，按当前 App 精确核对对应安装记录。需要 Python 3 标准库运行只读安装检查。首次使用须正常打开 Lulu 完成安装准备；新版无需激活码。系统授权窗口若实际出现，由用户本人处理。此仓库不包含 Lulu 主程序或模型。
+当前支持 macOS 上独立安装的 `/Applications/Paul工作台.app`，使用 generation 9 安装校验和 CLI 1.0.0 协议。只读安装检查需要 Python 3 标准库。首次使用请正常打开 Paul工作台，等待安装准备完成。旧安装路径可使用上一版发布中的 Skill。
 
 ## 安装
 
-先安装并打开 Lulu，完成正常安装准备，再把下面这段话发给你使用的 Agent：
+先安装并打开 Paul工作台，完成正常安装准备，再把下面这段话发给你使用的 Agent：
 
-> 请访问 https://github.com/paulussamvel-lang/Lulu/tree/main/agent-skill ，阅读 README，下载完整的 agent-skill/lulu-agent 文件夹，安装到你当前使用的技能目录。先检查脚本和兼容性，不覆盖已有同名内容。保留所有 scripts 和 references 文件。不要改动 Lulu 管理的 ~/.agents/skills/lulu-agent，也不要安装或删除 Lulu 后台组件。安装后按 SKILL.md 验证本机 Lulu，再查询实际可用功能。本次仅安装与检查连接，不下载模型，不修改文稿，不开始转录、配音或云端调用。
+> 请访问 https://github.com/paulussamvel-lang/Lulu/tree/main/agent-skill ，阅读 README，下载完整的 agent-skill/lulu-agent 文件夹，安装到你当前使用的技能目录。先检查脚本和兼容性，不覆盖已有同名内容。保留所有 scripts 和 references 文件。不要改动 Lulu 管理的 ~/.agents/skills/lulu-agent，也不要安装或删除 Lulu 后台组件。安装后按 SKILL.md 验证本机 Paul工作台，再查询实际可用功能。本次仅安装与检查连接，不下载模型，不修改文稿，不开始转录、配音或云端调用。
 
 手动下载 ZIP 后先解压，并保留整个 `lulu-agent` 文件夹及其中的 `scripts`、`references`；只下载 `SKILL.md` 无法完成校验。
 
@@ -58,7 +58,7 @@ python3 -B manage.py install --skills-dir "$HOME/.codex/skills"
 - “用 Lulu 把这段录音转成文字。”
 - “用我保存的音色朗读这篇文稿。”
 
-Agent 先验证 Lulu，再查询功能和模型。文稿修改、联网下载、云端调用等实际操作仍以你的请求和 Lulu 返回的要求为准。只安装技能不会自动执行这些任务。
+Agent 先验证 Paul工作台，再查询功能和模型。文稿修改、联网下载、云端调用等实际操作仍以你的请求和 Lulu 返回的要求为准。只安装技能不会自动执行这些任务。
 
 ## 更新与卸载
 

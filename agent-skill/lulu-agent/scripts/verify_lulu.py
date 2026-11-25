@@ -12,7 +12,7 @@ import sys
 import unicodedata
 
 
-APP = Path("/Applications/Lulu.app")
+APP = Path("/Applications/Paul工作台.app")
 MANIFEST = Path("Contents/Resources/agent_product_manifest.json")
 CLI = Path("Contents/MacOS/lulu-agent-cli")
 
